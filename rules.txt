@@ -1,0 +1,162 @@
+# Full-Stack Cleaning Service App Instructions ## Project Overview
+The Full-Stack Cleaning Service App will provide a complete solution for managing cleaning service bookings through web and mobile interfaces. The project uses the following technologies:
+
+Web Frontend: React with React Router, styled using a UI library like Tailwind CSS or Material-UI.
+Mobile App: React Native with Expo for cross-platform development.
+Backend: Supabase (PostgreSQL-based) for user authentication, API endpoints, and database management.
+The app will include:
+
+User registration, login, and role-based access control.
+Booking management for clients to schedule and view appointments.
+Cleaning staff checklists to update task progress.
+A quoting tool for first-time users.
+Responsive design for both web and mobile platforms.
+--- ## Core Functionalities ### 1. User Authentication (Web and Mobile)
+Description: Enable user registration, login, and role-based access control using Supabase’s built-in authentication services.
+
+Features:
+
+Sign-up and login functionality for both clients and cleaning staff.
+Secure password handling with email/password or social providers if needed.
+Persistent user sessions with token-based authentication.
+Role-based access: separate views for clients and staff.
+Web Implementation:
+
+Create LoginPage.jsx and RegisterPage.jsx using React.
+Use Supabase’s JavaScript client for handling authentication requests.
+Mobile Implementation:
+
+Create LoginScreen.js and RegisterScreen.js using React Native with Expo.
+Use Supabase client for mobile-friendly authentication handling.
+API Endpoints:
+
+Supabase handles this through its built-in authentication mechanism.
+Step-by-Step Instructions:
+
+Set up Supabase project and enable authentication.
+Configure .env to store Supabase API keys.
+Implement client-side forms for login and registration.
+Handle errors such as invalid credentials or network issues.
+Redirect users based on roles (clients or staff).
+--- ### 2. Booking Management
+Description: Clients should be able to schedule cleaning services through a booking form. Cleaning staff should see a list of assigned bookings.
+
+Web Features:
+
+Booking form using a date-picker component (e.g., React-Datepicker).
+Booking history view for clients to see previous and upcoming appointments.
+Mobile Features:
+
+Create a booking screen using a calendar picker.
+Allow modification of existing bookings.
+Backend Setup:
+
+Table: bookings with fields:
+id (primary key)
+client_id (references users)
+cleaning_date (date of appointment)
+status (pending, completed)
+details (cleaning details like service type, number of rooms)
+API Endpoints:
+
+POST /bookings: Create a new booking.
+GET /bookings/:userId: Retrieve a user’s bookings.
+PUT /bookings/:bookingId: Update or cancel a booking.
+Step-by-Step Instructions:
+
+Design the booking form with date and time selectors.
+Create API endpoints for adding and fetching bookings.
+Display bookings in a list view for clients and staff.
+Handle real-time booking updates (optional) using Supabase’s subscription feature.
+--- ### 3. Cleaning Checklist Management
+Description: Provide cleaning staff with task checklists that they can mark as complete during or after cleaning appointments.
+
+Web & Mobile Features:
+
+A dedicated screen displaying tasks for a specific appointment.
+Checkboxes or toggles for marking tasks as completed.
+Backend Setup:
+
+Table: checklists with fields:
+id (primary key)
+booking_id (references bookings)
+task_name (name of the task)
+is_completed (boolean)
+API Endpoints:
+
+GET /checklists/:bookingId: Retrieve checklist for a booking.
+POST /checklists: Create tasks when a booking is scheduled.
+PUT /checklists/:taskId: Update the status of a task.
+Step-by-Step Instructions:
+
+Create a table in Supabase to store checklist items.
+Generate default checklists when a new booking is created.
+Create UI components for displaying and updating tasks.
+Use Supabase’s API to fetch and update tasks in real-time.
+--- ### 4. Quoting Functionality for First-Time Users
+Description: First-time visitors can input property details and service frequency to receive an estimated service quote.
+
+Web & Mobile Features:
+
+A form where users input:
+Property size (square feet)
+Number of rooms/bathrooms
+Frequency of cleaning
+Display of the calculated quote.
+Backend Setup:
+
+Table: quotes with fields:
+id (primary key)
+property_size
+num_rooms
+frequency
+calculated_price
+API Endpoints:
+
+POST /quotes: Accepts user inputs and returns a calculated quote.
+Calculation Example:
+
+Base price: $100
+$20 per additional room
+$10 per bathroom
+10% discount for weekly cleaning
+Step-by-Step Instructions:
+
+Design input form with fields for property details.
+Validate inputs (e.g., numbers, required fields).
+Create API endpoint that calculates the quote.
+Display quote on the page or screen after submission.
+--- ## Docs ### 1. Supabase
+Library/API: Supabase (for authentication, database, and API)
+Documentation Link: [https://supabase.com/docs](https://supabase.com/docs)
+### 2. React Router
+Library: React Router (for navigation in web app)
+Documentation Link: [https://reactrouter.com/](https://reactrouter.com/)
+### 3. React Navigation
+Library: React Navigation (for mobile navigation)
+Documentation Link: [https://reactnavigation.org/](https://reactnavigation.org/)
+### 4. UI Library
+Library: Tailwind CSS (or an alternative like Material-UI)
+Documentation Link: [https://tailwindcss.com/](https://tailwindcss.com/)
+--- ## Important Implementation Notes
+Use environment variables to store Supabase keys and other sensitive information.
+Follow security best practices, such as validating user input and implementing role-based access control.
+Consider setting up a staging environment for testing before production deployment.
+--- ## Deployment Instructions
+Web App:
+
+Install dependencies with npm install.
+Run locally using npm start.
+Deploy to Vercel or Netlify with proper environment configuration.
+Mobile App:
+
+Run locally using Expo CLI (npx expo start).
+Build and publish via Expo’s build service.
+Backend (Supabase):
+
+Set up tables and configure RLS (Row-Level Security) policies.
+Ensure API endpoints are properly tested.
+Environment Variables:
+
+Store API keys, database URLs, and secret keys in .env files.
+Please do not change the pricing logic
