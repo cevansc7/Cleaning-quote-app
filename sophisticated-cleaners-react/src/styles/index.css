@@ -1,0 +1,268 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  /* Base styles */
+  body {
+    @apply bg-background text-primary font-sans m-0 p-5 min-h-screen;
+  }
+
+  /* Notification styles */
+  .notification {
+    @apply fixed top-4 right-4 p-4 rounded-lg shadow-lg max-w-md z-50
+    flex items-center justify-between gap-4;
+  }
+
+  .notification.success {
+    @apply bg-success/20 text-success border border-success;
+  }
+
+  .notification.error {
+    @apply bg-error/20 text-error border border-error;
+  }
+
+  .notification.info {
+    @apply bg-gold/20 text-gold border border-gold;
+  }
+
+  .close-btn {
+    @apply text-2xl opacity-70 hover:opacity-100 transition-opacity;
+  }
+
+  /* Calendar styles */
+  .fc.fc-theme-standard {
+    @apply font-sans bg-[#1a1a1a] rounded-lg p-6 border border-border;
+  }
+
+  .fc .fc-toolbar-title {
+    @apply text-gold text-2xl font-bold;
+  }
+
+  .fc .fc-col-header {
+    @apply bg-[#2a2a2a] border-b-2 border-gold/30;
+  }
+
+  .fc th[role="columnheader"],
+  .fc .fc-col-header-cell-cushion,
+  .fc .fc-col-header-cell .fc-scrollgrid-sync-inner {
+    @apply text-white text-base font-bold py-3;
+    background: transparent;
+  }
+
+  .fc .fc-timegrid-axis-cushion,
+  .fc .fc-timegrid-slot-label-cushion {
+    @apply text-gold/90 font-medium;
+  }
+
+  .fc .fc-timegrid-slot.fc-timegrid-slot-lane {
+    @apply h-16 border-border/20;
+  }
+
+  .fc .fc-timegrid-col.fc-day {
+    @apply bg-[#1f1f1f];
+  }
+
+  .fc .fc-timegrid-col.fc-day-today {
+    @apply bg-[#2a2a2a];
+  }
+
+  .fc .fc-event {
+    @apply shadow-lg hover:shadow-xl transition-shadow cursor-pointer 
+    border-none rounded-md;
+  }
+
+  .fc .fc-button {
+    @apply bg-[#2a2a2a] border-2 border-gold text-gold font-medium px-3 py-1.5 
+    rounded hover:bg-gold hover:text-background transition-all;
+  }
+
+  .fc .fc-button.fc-button-active {
+    @apply bg-gold text-background border-gold;
+  }
+
+  .fc .fc-day-today {
+    @apply bg-gold/5;
+  }
+
+  .fc td, 
+  .fc th {
+    @apply border-border/20;
+  }
+
+  .fc .fc-timegrid-divider {
+    @apply hidden;
+  }
+
+  /* Custom styles */
+  .quote-container {
+    @apply max-w-3xl mx-auto my-12 p-10 bg-container rounded-2xl border border-border shadow-lg;
+  }
+
+  h2 {
+    @apply text-2xl font-bold mb-8 text-center text-gold;
+  }
+
+  .package-options {
+    @apply flex flex-col gap-4 mb-8;
+  }
+
+  .package-option {
+    @apply flex items-start gap-4 bg-[#2a2a2a] border border-border rounded-xl p-6 
+    cursor-pointer transition-all duration-300;
+  }
+
+  .package-option input[type="radio"] {
+    @apply mr-5 scale-125 mt-1;
+  }
+
+  .package-option.selected {
+    @apply bg-[#3a3a3a] border-gold;
+  }
+
+  .package-option label {
+    @apply text-primary;
+  }
+
+  .package-option label strong {
+    @apply block text-lg mb-1;
+  }
+
+  .quote-form {
+    @apply mt-8;
+  }
+
+  .form-section {
+    @apply space-y-4;
+  }
+
+  .form-row {
+    @apply grid grid-cols-2 gap-x-8 gap-y-4;
+  }
+
+  .form-row:first-child {
+    @apply col-span-2;
+  }
+
+  label {
+    @apply block text-sm text-secondary mb-2;
+  }
+
+  select, input[type="number"], input[type="email"], input[type="password"] {
+    @apply w-full p-2 bg-[#2a2a2a] border border-border rounded text-primary;
+  }
+
+  select:focus, input[type="number"]:focus, input[type="email"]:focus, input[type="password"]:focus {
+    @apply border-gold outline-none;
+  }
+
+  .quote-result {
+    @apply mt-8 p-6 bg-input border border-gold rounded-xl text-center;
+  }
+
+  .quote-result h3 {
+    @apply text-xl font-semibold mb-4;
+  }
+
+  .quote-result .price {
+    @apply text-4xl font-bold text-gold mb-6;
+  }
+
+  .btn {
+    @apply w-full py-3 bg-gold text-background font-semibold rounded
+    hover:bg-gold-hover transition-colors duration-300;
+  }
+
+  .auth-container {
+    @apply max-w-md w-full mx-4 p-8 bg-container rounded-xl border border-border;
+  }
+
+  .auth-form {
+    @apply space-y-6;
+  }
+
+  .form-group {
+    @apply space-y-2;
+  }
+
+  .error-message {
+    @apply p-3 mb-4 bg-red-900/50 border border-red-500 rounded text-red-500 text-sm;
+  }
+
+  .auth-link {
+    @apply mt-6 text-center text-secondary;
+  }
+
+  .auth-link a {
+    @apply text-gold hover:text-gold-hover;
+  }
+
+  .btn-secondary {
+    @apply px-4 py-2 bg-container border border-gold text-gold rounded
+    hover:bg-gold hover:text-background transition-all duration-300;
+  }
+
+  nav {
+    @apply sticky top-0 z-50 shadow-lg;
+  }
+
+  .booking-form {
+    @apply mt-6 space-y-4;
+  }
+
+  input[type="date"],
+  input[type="time"] {
+    @apply w-full p-2 bg-[#2a2a2a] border border-border rounded text-primary;
+  }
+
+  input[type="date"]:focus,
+  input[type="time"]:focus {
+    @apply border-gold outline-none;
+  }
+
+  /* Calendar Header Styles */
+  .fc .fc-col-header {
+    @apply bg-[#2a2a2a] border-b-2 border-gold/30;
+  }
+
+  /* Target the specific header cells by their data attributes */
+  .fc th[role="columnheader"][data-date] {
+    @apply text-white font-bold;
+  }
+
+  /* Target the header wrapper */
+  .fc .fc-scroller-harness .fc-scroller .fc-col-header {
+    @apply bg-[#2a2a2a];
+  }
+
+  /* Calendar Header - Very Specific Selectors */
+  .fc .fc-col-header-cell a {
+    @apply text-white text-base font-bold !important;
+    text-decoration: none !important;
+  }
+
+  .fc .fc-col-header-cell {
+    @apply bg-[#2a2a2a] !important;
+    border-color: #333333 !important;
+  }
+
+  .fc .fc-col-header-cell-cushion {
+    @apply text-white text-base font-bold py-4 !important;
+    display: inline-block !important;
+  }
+
+  /* Override any FullCalendar styles */
+  .fc-theme-standard .fc-scrollgrid-header-row th {
+    @apply text-white !important;
+    background-color: #2a2a2a !important;
+  }
+
+  /* Force text color for all header elements */
+  .fc-col-header *,
+  .fc-col-header-cell *,
+  .fc-scrollgrid-sync-inner * {
+    @apply text-white !important;
+  }
+
+  /* Add more custom styles as needed */
+} 
