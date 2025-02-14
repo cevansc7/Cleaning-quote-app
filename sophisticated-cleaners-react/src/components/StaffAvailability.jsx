@@ -2,39 +2,45 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useNotification } from '../contexts/NotificationContext';
 
-function StaffAvailability() {
+function StaffAvailability({ staffId }) {
   const [availability, setAvailability] = useState([]);
   const [loading, setLoading] = useState(true);
   const { showNotification } = useNotification();
+  const [isEditing, setIsEditing] = useState(false);
 
   const daysOfWeek = [
-    'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'
+    'Sunday', 'Monday', 'Tuesday', 'Wednesday', 
+    'Thursday', 'Friday', 'Saturday'
   ];
+
+  const defaultTimes = {
+    start: '09:00',
+    end: '17:00'
+  };
 
   useEffect(() => {
     fetchAvailability();
-  }, []);
+  }, [staffId]);
 
   const fetchAvailability = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
+      setLoading(true);
       const { data, error } = await supabase
         .from('staff_availability')
         .select('*')
-        .eq('staff_id', user.id)
+        .eq('staff_id', staffId)
         .order('day_of_week');
 
       if (error) throw error;
 
-      // Create default availability for missing days
-      const availabilityMap = new Map(data.map(a => [a.day_of_week, a]));
-      const fullAvailability = daysOfWeek.map(day => {
-        return availabilityMap.get(day) || {
-          day_of_week: day,
-          start_time: '09:00',
-          end_time: '17:00',
-          is_available: false
+      // Initialize empty availability for all days if none exists
+      const fullAvailability = daysOfWeek.map((day, index) => {
+        const existing = data?.find(a => a.day_of_week === index);
+        return existing || {
+          day_of_week: index,
+          start_time: defaultTimes.start,
+          end_time: defaultTimes.end,
+          staff_id: staffId
         };
       });
 
@@ -47,93 +53,104 @@ function StaffAvailability() {
     }
   };
 
-  const updateAvailability = async (day, updates) => {
+  const handleSave = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const existingDay = availability.find(a => a.day_of_week === day);
+      setLoading(true);
 
-      if (existingDay?.id) {
-        // Update existing availability
-        const { error } = await supabase
-          .from('staff_availability')
-          .update({
-            ...updates,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', existingDay.id);
+      // Upsert all availability records
+      const { error } = await supabase
+        .from('staff_availability')
+        .upsert(availability.map(a => ({
+          staff_id: staffId,
+          day_of_week: a.day_of_week,
+          start_time: a.start_time,
+          end_time: a.end_time
+        })));
 
-        if (error) throw error;
-      } else {
-        // Create new availability
-        const { error } = await supabase
-          .from('staff_availability')
-          .insert([{
-            staff_id: user.id,
-            day_of_week: day,
-            ...updates
-          }]);
+      if (error) throw error;
 
-        if (error) throw error;
-      }
-
-      await fetchAvailability();
       showNotification('Availability updated successfully', 'success');
+      setIsEditing(false);
     } catch (error) {
       console.error('Error updating availability:', error);
       showNotification('Error updating availability', 'error');
+    } finally {
+      setLoading(false);
     }
   };
 
-  if (loading) {
-    return <div className="text-secondary">Loading availability...</div>;
-  }
+  const handleTimeChange = (dayIndex, field, value) => {
+    setAvailability(prev => prev.map(a => 
+      a.day_of_week === dayIndex 
+        ? { ...a, [field]: value }
+        : a
+    ));
+  };
+
+  if (loading) return <div className="text-secondary">Loading availability...</div>;
 
   return (
     <div className="space-y-4">
-      <h3 className="text-lg font-semibold text-gold">Availability Settings</h3>
+      <div className="flex justify-between items-center">
+        <h3 className="text-lg font-semibold text-primary">Weekly Availability</h3>
+        {!isEditing ? (
+          <button
+            onClick={() => setIsEditing(true)}
+            className="px-4 py-2 bg-gold text-background rounded hover:bg-gold/90"
+          >
+            Edit Availability
+          </button>
+        ) : (
+          <div className="flex gap-2">
+            <button
+              onClick={handleSave}
+              className="px-4 py-2 bg-gold text-background rounded hover:bg-gold/90"
+            >
+              Save
+            </button>
+            <button
+              onClick={() => {
+                setIsEditing(false);
+                fetchAvailability();
+              }}
+              className="px-4 py-2 bg-error text-background rounded hover:bg-error/90"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+      </div>
+
       <div className="grid gap-4">
-        {availability.map(day => (
+        {availability.map((day) => (
           <div 
             key={day.day_of_week}
-            className="p-4 bg-container border border-border rounded-lg"
+            className="p-4 bg-container rounded-lg flex items-center justify-between"
           >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <input
-                  type="checkbox"
-                  id={`available-${day.day_of_week}`}
-                  checked={day.is_available}
-                  onChange={(e) => updateAvailability(day.day_of_week, {
-                    is_available: e.target.checked
-                  })}
-                  className="h-4 w-4 rounded border-border text-gold focus:ring-gold"
-                />
-                <label 
-                  htmlFor={`available-${day.day_of_week}`}
-                  className="capitalize font-medium text-primary"
-                >
-                  {day.day_of_week}
-                </label>
-              </div>
-              <div className="flex items-center gap-4">
+            <span className="text-primary font-medium w-32">
+              {daysOfWeek[day.day_of_week]}
+            </span>
+            
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-secondary">From</span>
                 <input
                   type="time"
                   value={day.start_time}
-                  onChange={(e) => updateAvailability(day.day_of_week, {
-                    start_time: e.target.value,
-                    is_available: true
-                  })}
-                  className="bg-input border border-border rounded px-2 py-1"
+                  onChange={(e) => handleTimeChange(day.day_of_week, 'start_time', e.target.value)}
+                  className="bg-input border border-border rounded px-3 py-1 text-primary"
+                  disabled={!isEditing}
                 />
-                <span className="text-secondary">to</span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-secondary">To</span>
                 <input
                   type="time"
                   value={day.end_time}
-                  onChange={(e) => updateAvailability(day.day_of_week, {
-                    end_time: e.target.value,
-                    is_available: true
-                  })}
-                  className="bg-input border border-border rounded px-2 py-1"
+                  onChange={(e) => handleTimeChange(day.day_of_week, 'end_time', e.target.value)}
+                  className="bg-input border border-border rounded px-3 py-1 text-primary"
+                  disabled={!isEditing}
                 />
               </div>
             </div>

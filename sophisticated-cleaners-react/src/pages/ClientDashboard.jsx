@@ -17,18 +17,24 @@ function ClientDashboard() {
   const { createNotification } = useNotificationSystem();
   const [statusFilter, setStatusFilter] = useState('all');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [bookingToCancel, setBookingToCancel] = useState(null);
 
   useEffect(() => {
     fetchBookings();
   }, [statusFilter]);
+
+  useEffect(() => {
+    console.log('bookingToCancel state changed:', bookingToCancel);
+  }, [bookingToCancel]);
 
   const fetchBookings = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
       console.log('Fetching bookings for client:', user.id);
+      console.log('Current status filter:', statusFilter);
 
-      // First try without status filter to see all bookings
+      // Get all bookings for the user
       const { data, error } = await supabase
         .from('bookings')
         .select(`
@@ -40,7 +46,6 @@ function ClientDashboard() {
           )
         `)
         .eq('client_id', user.id)
-        // .eq('status', statusFilter) // Temporarily comment this out
         .order('cleaning_date', { ascending: true });
 
       if (error) {
@@ -48,19 +53,30 @@ function ClientDashboard() {
         throw error;
       }
 
-      console.log('Client Dashboard - Raw fetched bookings:', data);
-      
+      console.log('Raw fetched bookings:', data);
+
       // Filter bookings based on status
       let filteredBookings;
       if (statusFilter === 'cancelled') {
-        filteredBookings = data?.filter(booking => booking.status === 'cancelled');
+        filteredBookings = data.filter(booking => booking.status === 'cancelled');
+        console.log('Cancelled bookings:', filteredBookings);
       } else if (statusFilter === 'all') {
-        filteredBookings = data?.filter(booking => booking.status !== 'cancelled');
+        filteredBookings = data.filter(booking => booking.status !== 'cancelled');
+        console.log('All active bookings:', filteredBookings);
       } else {
-        filteredBookings = data?.filter(booking => booking.status === statusFilter);
+        filteredBookings = data.filter(booking => 
+          booking.status === statusFilter && booking.status !== 'cancelled'
+        );
+        console.log('Status filtered bookings:', filteredBookings);
       }
-      
-      console.log('Client Dashboard - Filtered bookings:', filteredBookings);
+
+      console.log('Filtered bookings:', {
+        statusFilter,
+        totalBookings: data?.length,
+        filteredCount: filteredBookings?.length,
+        bookings: filteredBookings
+      });
+
       setBookings(filteredBookings || []);
     } catch (error) {
       console.error('Error:', error);
@@ -80,81 +96,55 @@ function ClientDashboard() {
   };
 
   const handleCancelBooking = async (bookingId) => {
-    console.log('Attempting to cancel booking:', bookingId);
-    
-    if (!window.confirm('Are you sure you want to cancel this booking? This cannot be undone.')) {
-      return;
-    }
-
     try {
-      // Get booking details first
-      const { data: bookingData, error: bookingError } = await supabase
+      console.log('Starting cancellation for booking:', bookingId);
+
+      // Get the current user
+      const { data: { user } } = await supabase.auth.getUser();
+      console.log('Current user:', user.id);
+
+      // Get the specific booking first
+      const { data: booking, error: fetchError } = await supabase
         .from('bookings')
-        .select(`
-          *,
-          staff_schedules (
-            staff_id,
-            staff (
-              id,
-              name
-            )
-          )
-        `)
+        .select('*')
         .eq('id', bookingId)
+        .eq('client_id', user.id)
         .single();
 
-      if (bookingError) throw bookingError;
+      console.log('Found booking:', booking);
 
-      // Update booking status
-      const { error: updateError } = await supabase
-        .from('bookings')
-        .update({ 
-          status: 'cancelled',
-          cancelled_at: new Date().toISOString(),
-          cancelled_reason: 'Cancelled by client'
-        })
-        .eq('id', bookingId);
-
-      if (updateError) throw updateError;
-
-      // Notify assigned staff members
-      if (bookingData.staff_schedules) {
-        for (const schedule of bookingData.staff_schedules) {
-          if (schedule.staff_id) {
-            await createNotification(
-              schedule.staff_id,
-              'Booking Cancelled',
-              `Booking for ${new Date(bookingData.cleaning_date).toLocaleDateString()} at ${bookingData.details.address.street} has been cancelled by the client.`,
-              'booking',
-              `/staff/dashboard`
-            );
-          }
-        }
+      if (fetchError || !booking) {
+        console.error('Fetch error or no booking found:', fetchError);
+        throw new Error('Booking not found');
       }
 
-      // Notify admin/supervisor
-      const { data: supervisors } = await supabase
-        .from('staff')
-        .select('id')
-        .eq('role', 'supervisor');
+      // Perform the update
+      const { error: updateError } = await supabase
+        .from('bookings')
+        .update({
+          status: 'cancelled',
+          cancelled_at: new Date().toISOString()
+        })
+        .eq('id', bookingId)
+        .eq('client_id', user.id);
 
-      if (supervisors) {
-        for (const supervisor of supervisors) {
-          await createNotification(
-            supervisor.id,
-            'Booking Cancelled',
-            `Booking #${bookingId.slice(0, 8)} for ${new Date(bookingData.cleaning_date).toLocaleDateString()} has been cancelled by the client.`,
-            'booking',
-            `/admin/dashboard`
-          );
-        }
+      if (updateError) {
+        console.error('Update error:', updateError);
+        throw updateError;
       }
 
       showNotification('Booking cancelled successfully', 'success');
-      fetchBookings(); // Refresh the list
+      
+      // Refresh the bookings list
+      setStatusFilter('cancelled');
+      await fetchBookings();
+
     } catch (error) {
-      console.error('Error cancelling booking:', error);
-      showNotification('Error cancelling booking', 'error');
+      console.error('Cancellation error:', error);
+      showNotification(
+        error.message || 'Error cancelling booking', 
+        'error'
+      );
     }
   };
 
@@ -355,8 +345,11 @@ function ClientDashboard() {
                         }
                       </p>
                       <button
-                        onClick={() => handleCancelBooking(booking.id)}
-                        className="w-full mt-3 px-4 py-2 bg-error/10 text-error border border-error/20 rounded hover:bg-error/20 transition-colors"
+                        onClick={() => {
+                          console.log('Setting booking to cancel:', booking.id);
+                          setBookingToCancel(booking.id);
+                        }}
+                        className="text-error hover:text-error/80"
                       >
                         Cancel Booking
                       </button>
@@ -413,6 +406,46 @@ function ClientDashboard() {
               <div className="mt-8">
                 <h2 className="text-xl font-semibold text-gold mb-4">Your Reviews</h2>
                 <ReviewsList />
+              </div>
+            )}
+
+            {/* Add confirmation dialog */}
+            {bookingToCancel && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+                <div className="bg-background rounded-lg p-6 max-w-md w-full">
+                  <h3 className="text-lg font-semibold text-primary mb-4">Cancel Booking</h3>
+                  <p className="text-secondary mb-2">
+                    Are you sure you want to cancel this booking? This action cannot be undone.
+                  </p>
+                  <p className="text-secondary mb-6 text-sm">
+                    Booking ID: {bookingToCancel}
+                  </p>
+                  <div className="flex justify-end gap-4">
+                    <button
+                      onClick={() => {
+                        console.log('Cancelling modal without action');
+                        setBookingToCancel(null);
+                      }}
+                      className="px-4 py-2 text-secondary hover:text-primary"
+                    >
+                      Keep Booking
+                    </button>
+                    <button
+                      onClick={async () => {
+                        console.log('Initiating cancellation for booking:', bookingToCancel);
+                        if (!bookingToCancel) {
+                          console.error('No booking ID available');
+                          return;
+                        }
+                        await handleCancelBooking(bookingToCancel);
+                        setBookingToCancel(null);
+                      }}
+                      className="px-4 py-2 bg-error text-background rounded hover:bg-error/90"
+                    >
+                      Yes, Cancel Booking
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
           </div>

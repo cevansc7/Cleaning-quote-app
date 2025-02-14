@@ -1,179 +1,145 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useNotification } from '../contexts/NotificationContext';
 
-function CleaningChecklist({ bookingId }) {
-  const [tasks, setTasks] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [showCompleted, setShowCompleted] = useState(true);
+function CleaningChecklist({ booking, onComplete }) {
+  const [checklist, setChecklist] = useState({
+    walkthrough: false,
+    setup: false,
+    requirements: false,
+    assignments: false,
+    cleaning: false,
+    finalCheck: false
+  });
   const { showNotification } = useNotification();
+  const [loading, setLoading] = useState(false);
 
-  // Calculate progress
-  const progress = tasks.length 
-    ? Math.round((tasks.filter(t => t.is_completed).length / tasks.length) * 100)
-    : 0;
+  const handleCheck = (item) => {
+    setChecklist(prev => ({
+      ...prev,
+      [item]: !prev[item]
+    }));
+  };
 
-  useEffect(() => {
-    let subscription;
+  const handleComplete = async () => {
+    if (!Object.values(checklist).every(Boolean)) {
+      showNotification('Please complete all tasks before marking as completed', 'error');
+      return;
+    }
 
-    const fetchTasks = async () => {
-      try {
-        console.log('Fetching tasks for booking:', bookingId);
-        const { data, error } = await supabase
-          .from('checklists')
-          .select('*')
-          .eq('booking_id', bookingId)
-          .order('order', { ascending: true })
-          .order('created_at', { ascending: true });
-
-        if (error) {
-          console.error('Error fetching tasks:', error);
-          throw error;
-        }
-
-        console.log('Fetched tasks:', data);
-        setTasks(data || []);
-      } catch (error) {
-        console.error('Error in fetchTasks:', error);
-        showNotification('Error loading checklist', 'error');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    const setupSubscription = async () => {
-      // Clean up any existing subscription
-      if (subscription) {
-        subscription.unsubscribe();
-      }
-
-      // Set up new subscription
-      subscription = supabase
-        .channel(`checklist-${bookingId}`)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'checklists',
-            filter: `booking_id=eq.${bookingId}`
-          },
-          (payload) => {
-            console.log('Checklist change received:', payload);
-            fetchTasks();
-          }
-        )
-        .subscribe((status) => {
-          console.log('Subscription status:', status);
-        });
-    };
-
-    fetchTasks();
-    setupSubscription();
-
-    return () => {
-      if (subscription) {
-        console.log('Cleaning up subscription');
-        subscription.unsubscribe();
-      }
-    };
-  }, [bookingId]);
-
-  const toggleTask = async (taskId, currentStatus) => {
+    setLoading(true);
     try {
-      console.log('Toggling task:', taskId, 'from', currentStatus, 'to', !currentStatus);
       const { error } = await supabase
-        .from('checklists')
+        .from('bookings')
         .update({ 
-          is_completed: !currentStatus,
-          updated_at: new Date().toISOString()
+          status: 'completed',
+          completion_checklist: checklist 
         })
-        .eq('id', taskId);
+        .eq('id', booking.id);
 
       if (error) throw error;
 
-      // Optimistically update the UI
-      setTasks(tasks.map(task => 
-        task.id === taskId 
-          ? { ...task, is_completed: !currentStatus }
-          : task
-      ));
-
+      showNotification('Booking marked as completed', 'success');
+      onComplete?.();
     } catch (error) {
-      console.error('Error updating task:', error);
-      showNotification('Error updating task', 'error');
+      console.error('Error completing booking:', error);
+      showNotification('Error marking booking as complete', 'error');
+    } finally {
+      setLoading(false);
     }
   };
 
-  if (loading) {
-    return <div className="text-secondary text-sm">Loading checklist...</div>;
-  }
-
-  if (!tasks.length) {
-    return <div className="text-secondary text-sm">No tasks found for this booking.</div>;
-  }
-
-  // Filter and sort tasks
-  const filteredTasks = tasks
-    .filter(task => showCompleted || !task.is_completed)
-    .sort((a, b) => {
-      if (a.is_completed === b.is_completed) {
-        return a.order - b.order;
-      }
-      return a.is_completed ? 1 : -1;
-    });
-
   return (
-    <div className="mt-4 space-y-3 sm:space-y-2">
-      <div className="flex justify-between items-center px-2 sm:px-0">
-        <h3 className="text-lg font-semibold text-gold">Cleaning Checklist</h3>
-        <button
-          onClick={() => setShowCompleted(!showCompleted)}
-          className="text-sm text-secondary hover:text-gold transition-colors"
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h3 className="text-gold font-medium">Cleaning Checklist</h3>
+        <button 
+          className="text-secondary text-sm hover:text-gold"
+          onClick={() => setChecklist(prev => {
+            const allChecked = Object.values(prev).every(Boolean);
+            return Object.keys(prev).reduce((acc, key) => ({
+              ...acc,
+              [key]: !allChecked
+            }), {});
+          })}
         >
-          {showCompleted ? 'Hide Completed' : 'Show Completed'}
+          {Object.values(checklist).every(Boolean) ? 'Uncheck All' : 'Check All'}
         </button>
       </div>
 
-      {/* Progress bar */}
-      <div className="w-full bg-background rounded-full h-2.5 mb-4">
-        <div 
-          className="bg-gold h-2.5 rounded-full transition-all duration-500"
-          style={{ width: `${progress}%` }}
-        />
+      <div className="space-y-2">
+        <label className="flex items-center gap-2 p-2 hover:bg-container/50 rounded cursor-pointer">
+          <input
+            type="checkbox"
+            checked={checklist.walkthrough}
+            onChange={() => handleCheck('walkthrough')}
+            className="form-checkbox text-gold rounded border-border focus:ring-gold"
+          />
+          <span className="text-secondary">Initial walkthrough and inspection</span>
+        </label>
+
+        <label className="flex items-center gap-2 p-2 hover:bg-container/50 rounded cursor-pointer">
+          <input
+            type="checkbox"
+            checked={checklist.setup}
+            onChange={() => handleCheck('setup')}
+            className="form-checkbox text-gold rounded border-border focus:ring-gold"
+          />
+          <span className="text-secondary">Setup cleaning equipment and supplies</span>
+        </label>
+
+        <label className="flex items-center gap-2 p-2 hover:bg-container/50 rounded cursor-pointer">
+          <input
+            type="checkbox"
+            checked={checklist.requirements}
+            onChange={() => handleCheck('requirements')}
+            className="form-checkbox text-gold rounded border-border focus:ring-gold"
+          />
+          <span className="text-secondary">Review client requirements and priorities</span>
+        </label>
+
+        <label className="flex items-center gap-2 p-2 hover:bg-container/50 rounded cursor-pointer">
+          <input
+            type="checkbox"
+            checked={checklist.assignments}
+            onChange={() => handleCheck('assignments')}
+            className="form-checkbox text-gold rounded border-border focus:ring-gold"
+          />
+          <span className="text-secondary">Assign areas to cleaners</span>
+        </label>
+
+        <label className="flex items-center gap-2 p-2 hover:bg-container/50 rounded cursor-pointer">
+          <input
+            type="checkbox"
+            checked={checklist.cleaning}
+            onChange={() => handleCheck('cleaning')}
+            className="form-checkbox text-gold rounded border-border focus:ring-gold"
+          />
+          <span className="text-secondary">Clean assigned areas</span>
+        </label>
+
+        <label className="flex items-center gap-2 p-2 hover:bg-container/50 rounded cursor-pointer">
+          <input
+            type="checkbox"
+            checked={checklist.finalCheck}
+            onChange={() => handleCheck('finalCheck')}
+            className="form-checkbox text-gold rounded border-border focus:ring-gold"
+          />
+          <span className="text-secondary">Final inspection and quality check</span>
+        </label>
       </div>
 
-      {filteredTasks.map(task => (
-        <div 
-          key={task.id}
-          className={`flex items-center gap-3 p-3 sm:p-2 rounded bg-container border border-border hover:border-gold/50 transition-colors ${
-            task.is_completed ? 'opacity-75' : ''
-          }`}
-        >
-          <div 
-            className="flex items-center flex-1 cursor-pointer"
-            onClick={() => toggleTask(task.id, task.is_completed)}
-          >
-            <input
-              type="checkbox"
-              checked={task.is_completed}
-              onChange={() => toggleTask(task.id, task.is_completed)}
-              className="h-6 w-6 sm:h-5 sm:w-5 rounded border-border text-gold focus:ring-gold cursor-pointer"
-            />
-            <span className={`ml-3 flex-1 ${
-              task.is_completed 
-                ? 'text-secondary line-through' 
-                : 'text-primary'
-            }`}>
-              {task.task_name}
-            </span>
-          </div>
-        </div>
-      ))}
-      <div className="text-right text-sm text-secondary px-2 sm:px-0 pt-2">
-        <span className="font-medium text-gold">{progress}%</span> complete
-        ({tasks.filter(t => t.is_completed).length} of {tasks.length} tasks)
-      </div>
+      <button
+        onClick={handleComplete}
+        disabled={loading || !Object.values(checklist).every(Boolean)}
+        className={`w-full py-2 px-4 rounded ${
+          Object.values(checklist).every(Boolean)
+            ? 'bg-success text-background hover:bg-success/90'
+            : 'bg-gray-500/20 text-gray-500 cursor-not-allowed'
+        }`}
+      >
+        {loading ? 'Marking as Complete...' : 'Mark as Completed'}
+      </button>
     </div>
   );
 }

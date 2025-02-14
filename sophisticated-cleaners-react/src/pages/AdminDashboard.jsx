@@ -16,6 +16,8 @@ function AdminDashboard() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [staffList, setStaffList] = useState([]);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [selectedBooking, setSelectedBooking] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const formatDate = (date) => {
     return new Date(date).toLocaleDateString('en-US', {
@@ -234,6 +236,11 @@ function AdminDashboard() {
     return staff.email || 'Unknown Staff';
   };
 
+  const handleBookingClick = (booking) => {
+    setSelectedBooking(booking);
+    setIsModalOpen(true);
+  };
+
   const renderBookings = () => (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -274,7 +281,8 @@ function AdminDashboard() {
             {bookings.map(booking => (
               <div
                 key={booking.id}
-                className="bg-container border border-border rounded-lg p-4 sm:p-6 hover:border-gold/50 transition-colors"
+                onClick={() => handleBookingClick(booking)}
+                className="bg-container border border-border rounded-lg p-4 sm:p-6 hover:border-gold/50 transition-colors cursor-pointer hover:bg-container/50"
               >
                 <div className="flex justify-between items-start mb-4">
                   <div>
@@ -571,7 +579,8 @@ function AdminDashboard() {
                   {bookings.map(booking => (
                     <div
                       key={booking.id}
-                      className="bg-container border border-border rounded-lg p-4 sm:p-6 hover:border-gold/50 transition-colors"
+                      onClick={() => handleBookingClick(booking)}
+                      className="bg-container border border-border rounded-lg p-4 sm:p-6 hover:border-gold/50 transition-colors cursor-pointer hover:bg-container/50"
                     >
                       <div className="flex justify-between items-start mb-4">
                         <div>
@@ -711,6 +720,79 @@ function AdminDashboard() {
           </div>
         )}
       </main>
+
+      {isModalOpen && selectedBooking && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-background rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 space-y-4">
+              <div className="flex justify-between items-start">
+                <h2 className="text-xl font-semibold text-gold">Booking Details</h2>
+                <button 
+                  onClick={() => setIsModalOpen(false)}
+                  className="text-secondary hover:text-gold"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* Booking Info */}
+                <div className="p-4 bg-container rounded-lg">
+                  <h3 className="font-medium text-primary mb-2">Booking Information</h3>
+                  <div className="space-y-2 text-secondary">
+                    <p>Date: {formatDate(selectedBooking.cleaning_date)}</p>
+                    <p>Time: {formatTime(selectedBooking.cleaning_date)}</p>
+                    <p>Status: {selectedBooking.status}</p>
+                    <p>Payment Status: {selectedBooking.payment_status}</p>
+                  </div>
+                </div>
+
+                {/* Client Info */}
+                <div className="p-4 bg-container rounded-lg">
+                  <h3 className="font-medium text-primary mb-2">Client Information</h3>
+                  <div className="space-y-2 text-secondary">
+                    <p>Email: {selectedBooking.details.client_email}</p>
+                    <p>Address: {`${selectedBooking.details.address.street}, ${selectedBooking.details.address.city}, ${selectedBooking.details.address.state} ${selectedBooking.details.address.zipCode}`}</p>
+                  </div>
+                </div>
+
+                {/* Service Details */}
+                <div className="p-4 bg-container rounded-lg">
+                  <h3 className="font-medium text-primary mb-2">Service Details</h3>
+                  <div className="space-y-2 text-secondary">
+                    <p>Package: {selectedBooking.details.package}</p>
+                    {selectedBooking.details.package === 'blockCleaning' && (
+                      <>
+                        <p>Cleaners: {selectedBooking.details.rooms.cleaners}</p>
+                        <p>Hours: {selectedBooking.details.rooms.hours}</p>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="p-4 bg-container rounded-lg">
+                  <h3 className="font-medium text-primary mb-2">Actions</h3>
+                  <div className="flex gap-2">
+                    <button 
+                      className="px-4 py-2 bg-gold text-background rounded hover:bg-gold/90"
+                      onClick={() => {/* Add status update logic */}}
+                    >
+                      Update Status
+                    </button>
+                    <button 
+                      className="px-4 py-2 bg-error text-background rounded hover:bg-error/90"
+                      onClick={() => {/* Add cancellation logic */}}
+                    >
+                      Cancel Booking
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

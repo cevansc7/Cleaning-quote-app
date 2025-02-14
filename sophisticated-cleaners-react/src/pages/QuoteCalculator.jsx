@@ -268,7 +268,8 @@ function QuoteCalculator() {
             zipCode: address.zipCode
           },
           client_email: user.email
-        }
+        },
+        staff_schedules: null  // Explicitly set to null
       };
 
       console.log('Attempting to create booking with data:', JSON.stringify(bookingData, null, 2));
