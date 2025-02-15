@@ -157,7 +157,8 @@ function StaffDashboard() {
             id,
             email,
             name
-          )
+          ),
+          booking_id
         `)
         .in('booking_id', bookingsData.map(booking => booking.id));
 
@@ -338,15 +339,15 @@ function StaffDashboard() {
 
   const handleAcceptJob = async (bookingId) => {
     try {
+      setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
       
-      // First verify the booking is still available
+      // First verify the booking is still available with a lock
       const { data: booking, error: checkError } = await supabase
         .from('bookings')
-        .select('*')
+        .select('*, staff_schedules(*)')
         .eq('id', bookingId)
         .eq('status', 'unassigned')
-        .is('staff_schedules', null)
         .single();
 
       if (checkError || !booking) {
@@ -355,16 +356,36 @@ function StaffDashboard() {
         return;
       }
 
-      // Then try to claim it
+      // Double check that no staff is assigned
+      if (booking.staff_schedules && booking.staff_schedules.length > 0) {
+        showNotification('This job has already been assigned to another staff member', 'error');
+        fetchUnassignedJobs(); // Refresh the list
+        return;
+      }
+
+      // Start transaction by updating status first
       const { error: updateError } = await supabase
         .from('bookings')
         .update({
           status: 'pending',
           updated_at: new Date().toISOString()
         })
-        .eq('id', bookingId);
+        .eq('id', bookingId)
+        .eq('status', 'unassigned'); // Ensure it's still unassigned
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('Error updating booking:', updateError);
+        showNotification('Unable to claim job - it may have been claimed by another staff member', 'error');
+        fetchUnassignedJobs();
+        return;
+      }
+
+      // Calculate end time based on booking details
+      const startTime = new Date(booking.cleaning_date);
+      const hours = booking.details.package === 'blockCleaning' 
+        ? booking.details.rooms.hours 
+        : 2; // Default to 2 hours for other packages
+      const endTime = new Date(startTime.getTime() + hours * 60 * 60 * 1000);
 
       // Create staff schedule
       const { error: scheduleError } = await supabase
@@ -372,13 +393,31 @@ function StaffDashboard() {
         .insert({
           staff_id: user.id,
           booking_id: bookingId,
-          start_time: booking.cleaning_date,
-          // Calculate end time based on hours in booking
-          end_time: new Date(new Date(booking.cleaning_date).getTime() + 
-            (booking.details.rooms?.hours || 1) * 60 * 60 * 1000).toISOString()
+          start_time: startTime.toISOString(),
+          end_time: endTime.toISOString(),
+          status: 'scheduled'
         });
 
-      if (scheduleError) throw scheduleError;
+      if (scheduleError) {
+        // If schedule creation fails, try to revert the booking status
+        console.error('Error creating schedule:', scheduleError);
+        const { error: revertError } = await supabase
+          .from('bookings')
+          .update({
+            status: 'unassigned',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', bookingId)
+          .eq('status', 'pending');
+        
+        if (revertError) {
+          console.error('Error reverting booking status:', revertError);
+        }
+        
+        showNotification('Error claiming job - please try again', 'error');
+        fetchUnassignedJobs();
+        return;
+      }
 
       showNotification('Job accepted successfully!', 'success');
       fetchUnassignedJobs(); // Refresh available jobs
@@ -386,7 +425,10 @@ function StaffDashboard() {
 
     } catch (error) {
       console.error('Error accepting job:', error);
-      showNotification('Error accepting job', 'error');
+      showNotification('Error accepting job: ' + error.message, 'error');
+      fetchUnassignedJobs(); // Refresh the list to show current state
+    } finally {
+      setLoading(false);
     }
   };
 

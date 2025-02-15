@@ -42,7 +42,12 @@ function ClientDashboard() {
           staff_schedules (
             staff_id,
             start_time,
-            end_time
+            end_time,
+            staff (
+              id,
+              email,
+              name
+            )
           )
         `)
         .eq('client_id', user.id)
@@ -362,11 +367,12 @@ function ClientDashboard() {
                       <p className="text-primary font-medium mb-2">Cleaning Staff</p>
                       {booking.staff_schedules.map((schedule, index) => (
                         <div key={index} className="text-sm text-secondary">
-                          Arriving at {new Date(schedule.start_time).toLocaleTimeString([], {
+                          <p className="font-medium">{schedule.staff?.name || schedule.staff?.email || 'Assigned Staff'}</p>
+                          <p>Arriving at {new Date(schedule.start_time).toLocaleTimeString([], {
                             hour: 'numeric',
                             minute: '2-digit',
                             hour12: true
-                          })}
+                          })}</p>
                         </div>
                       ))}
                     </div>

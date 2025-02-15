@@ -57,7 +57,7 @@ function AdminDashboard() {
         raw: currentUser
       });
 
-      // Explicitly set auth header
+      // Explicitly set auth header and include staff_schedules in the query
       const { data: allBookings, error: basicError } = await supabase
         .from('bookings')
         .select(`
@@ -66,7 +66,18 @@ function AdminDashboard() {
           cleaning_date,
           status,
           payment_status,
-          details
+          details,
+          staff_schedules (
+            id,
+            staff_id,
+            start_time,
+            end_time,
+            status,
+            staff (
+              name,
+              phone
+            )
+          )
         `)
         .order('cleaning_date', { ascending: false });
 
@@ -193,7 +204,19 @@ function AdminDashboard() {
       const endTime = new Date(startTime);
       endTime.setHours(endTime.getHours() + parseInt(hours));
 
-      const { error } = await supabase
+      // First update booking status
+      const { error: bookingError } = await supabase
+        .from('bookings')
+        .update({ 
+          status: 'pending',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', bookingId);
+
+      if (bookingError) throw bookingError;
+
+      // Then create staff schedule
+      const { error: scheduleError } = await supabase
         .from('staff_schedules')
         .insert([{
           staff_id: staffId,
@@ -202,7 +225,7 @@ function AdminDashboard() {
           end_time: endTime.toISOString()
         }]);
 
-      if (error) throw error;
+      if (scheduleError) throw scheduleError;
 
       showNotification('Staff assigned successfully', 'success');
       fetchBookings();

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabaseClient';
@@ -15,6 +15,32 @@ const TREASURE_VALLEY_ZIP_CODES = [
   '83643', // Meridian
   '83687', // Meridian
 ];
+
+// Base prices for different cleaning types (hourly rates)
+const standardCleaning = 45;  // $45/hr
+const deepCleaning = 63;      // $63/hr
+const moveInOutCleaning = 60; // $60/hr
+
+// Base cleaning times in hours
+const baseCleaningTimes = {
+  bedroom: 7 / 60,          // 7 mins
+  bathroom: 25 / 60,        // 25 mins
+  halfBathroom: 15 / 60,    // 15 mins
+  kitchen: 30 / 60,         // 30 mins
+  livingRoom: 20 / 60,      // 20 mins
+  bonusRoom: 15 / 60,       // 15 mins
+  laundryRoom: 5 / 60,      // 5 mins
+  office: 5 / 60            // 5 mins
+};
+
+// Dirtiness scale adjustment (multipliers)
+const dirtinessMultipliers = {
+  1: 1.15,   // Light
+  2: 1.25,
+  3: 1.35,
+  4: 1.75,
+  5: 2.0     // Very Dirty
+};
 
 function QuoteCalculator() {
   const navigate = useNavigate();
@@ -62,53 +88,67 @@ function QuoteCalculator() {
   };
 
   const calculateQuote = () => {
-    let basePrice = 0;
+    let totalTime = 0;
     
     if (selectedPackage === 'breatheEasy') {
-      // Base price by service type
+      // Calculate total time based on rooms
+      totalTime += parseInt(formData.bedrooms) * baseCleaningTimes.bedroom;
+      totalTime += parseInt(formData.bathrooms) * baseCleaningTimes.bathroom;
+      totalTime += parseInt(formData.halfBathrooms) * baseCleaningTimes.halfBathroom;
+      totalTime += parseInt(formData.kitchens) * baseCleaningTimes.kitchen;
+      totalTime += parseInt(formData.livingRooms) * baseCleaningTimes.livingRoom;
+      totalTime += parseInt(formData.bonusRooms) * baseCleaningTimes.bonusRoom;
+      totalTime += parseInt(formData.laundryRooms) * baseCleaningTimes.laundryRoom;
+      totalTime += parseInt(formData.offices) * baseCleaningTimes.office;
+
+      // Add time for square footage (30 mins per 500 sqft)
+      totalTime += Math.ceil(parseInt(formData.sqft) / 500) * 0.5;
+
+      // Apply dirtiness multiplier
+      totalTime *= dirtinessMultipliers[parseInt(formData.dirtyScale)];
+
+      // Calculate base price using hourly rate
+      let basePrice = 0;
       switch (formData.serviceSelection) {
         case 'standardCleaning':
-          basePrice = 100;
+          basePrice = standardCleaning * totalTime;
           break;
         case 'deepCleaning':
-          basePrice = 150;
+          basePrice = deepCleaning * totalTime;
           break;
         case 'moveInOutCleaning':
-          basePrice = 200;
+          basePrice = moveInOutCleaning * totalTime;
           break;
         default:
           alert('Please select a service type');
           return;
       }
 
-      // Add room costs
-      basePrice += parseInt(formData.bedrooms) * 30;
-      basePrice += parseInt(formData.bathrooms) * 40;
-      basePrice += parseInt(formData.halfBathrooms) * 20;
-      basePrice += parseInt(formData.kitchens) * 50;
-      basePrice += parseInt(formData.livingRooms) * 35;
-      basePrice += parseInt(formData.bonusRooms) * 35;
-      basePrice += parseInt(formData.laundryRooms) * 25;
-      basePrice += parseInt(formData.offices) * 30;
+      // Round to whole number (floor)
+      basePrice = Math.floor(basePrice);
 
-      // Adjust for dirtiness scale
-      basePrice *= (1 + (parseInt(formData.dirtyScale) - 1) * 0.2);
+      setQuoteResult({
+        price: basePrice,
+        details: {
+          package: selectedPackage,
+          serviceType: formData.serviceSelection,
+          estimatedTime: totalTime,
+          ...formData
+        }
+      });
 
     } else if (selectedPackage === 'blockCleaning') {
-      const hourlyRate = 35;
-      basePrice = parseInt(formData.cleaners) * parseInt(formData.hours) * hourlyRate;
+      const hourlyRate = standardCleaning; // Use standard cleaning rate for block cleaning
+      const totalPrice = Math.floor(parseInt(formData.cleaners) * parseInt(formData.hours) * hourlyRate);
+
+      setQuoteResult({
+        price: totalPrice,
+        details: {
+          package: selectedPackage,
+          ...formData
+        }
+      });
     }
-
-    // Round to 2 decimal places
-    basePrice = Math.round(basePrice * 100) / 100;
-
-    setQuoteResult({
-      price: basePrice,
-      details: {
-        package: selectedPackage,
-        ...formData
-      }
-    });
   };
 
   const geocodeAddress = async () => {
@@ -202,273 +242,225 @@ function QuoteCalculator() {
   };
 
   const handleBooking = async () => {
-    if (!user) {
-      if (window.confirm('Please login or register to book a cleaning. Would you like to login now?')) {
-        navigate('/login');
-      }
-      return;
-    }
-
-    // Validate date and time
-    if (!bookingDate || !bookingTime) {
-      showNotification('Please select both date and time for your booking', 'error');
-      return;
-    }
-
-    // Validate address
-    if (!validateAddress()) {
-      return;
-    }
-
     try {
       setLoading(true);
-
-      // Log the user state first
-      console.log('Current user:', user);
-
-      // Get coordinates from address
-      const location = await geocodeAddress();
-      if (!location) {
-        console.error('Failed to get location');
-        setLoading(false);
+      console.log('Starting booking process...');
+      
+      const { data: { user: authUser }, error: userError } = await supabase.auth.getUser();
+      console.log('Auth user:', authUser);
+      
+      if (userError || !authUser) {
+        console.error('User error:', userError);
+        showNotification('Please log in to book a cleaning', 'error');
         return;
       }
 
-      // Create the booking data object
+      // Validate date and time
+      if (!bookingDate || !bookingTime) {
+        showNotification('Please select both date and time for your booking', 'error');
+        return;
+      }
+
+      // Validate address
+      if (!validateAddress()) {
+        return;
+      }
+
+      // Validate quote result exists
+      if (!quoteResult || !quoteResult.price) {
+        showNotification('Please get a quote before booking', 'error');
+        return;
+      }
+
+      // Get coordinates for the address
+      const coordinates = await geocodeAddress();
+      if (!coordinates) {
+        showNotification('Could not verify address location. Please check the address and try again.', 'error');
+        return;
+      }
+
       const bookingData = {
-        client_id: user.id,
-        cleaning_date: `${bookingDate}T${bookingTime}:00`,
+        client_id: authUser.id,
+        cleaning_date: new Date(bookingDate + 'T' + bookingTime).toISOString(),
         status: 'unassigned',
         payment_status: 'pending',
-        amount_paid: quoteResult.price * 100,
+        amount_paid: quoteResult.price,
         details: {
           package: selectedPackage,
-          serviceType: selectedPackage === 'breatheEasy' ? formData.serviceSelection : 'blockCleaning',
+          serviceType: selectedPackage === 'breatheEasy' ? formData.serviceSelection : null,
           price: quoteResult.price,
-          rooms: selectedPackage === 'breatheEasy' ? {
-            bedrooms: parseInt(formData.bedrooms),
-            bathrooms: parseInt(formData.bathrooms),
-            halfBathrooms: parseInt(formData.halfBathrooms),
-            kitchens: parseInt(formData.kitchens),
-            livingRooms: parseInt(formData.livingRooms),
-            bonusRooms: parseInt(formData.bonusRooms),
-            laundryRooms: parseInt(formData.laundryRooms),
-            offices: parseInt(formData.offices),
-            sqft: parseInt(formData.sqft),
-            dirtyScale: parseInt(formData.dirtyScale)
-          } : {
-            cleaners: parseInt(formData.cleaners),
-            hours: parseInt(formData.hours)
-          },
-          location: location,
+          rooms: selectedPackage === 'blockCleaning' 
+            ? {
+                cleaners: parseInt(formData.cleaners),
+                hours: parseInt(formData.hours)
+              }
+            : {
+                bedrooms: parseInt(formData.bedrooms),
+                bathrooms: parseInt(formData.bathrooms),
+                halfBathrooms: parseInt(formData.halfBathrooms),
+                kitchens: parseInt(formData.kitchens),
+                livingRooms: parseInt(formData.livingRooms),
+                bonusRooms: parseInt(formData.bonusRooms),
+                laundryRooms: parseInt(formData.laundryRooms),
+                offices: parseInt(formData.offices),
+                sqft: parseInt(formData.sqft),
+                dirtyScale: parseInt(formData.dirtyScale)
+              },
           address: {
             street: address.street,
             city: address.city,
             state: address.state,
-            zipCode: address.zipCode
+            zipCode: address.zipCode,
+            coordinates: coordinates
           },
-          client_email: user.email
-        },
-        staff_schedules: null  // Explicitly set to null
+          client_email: authUser.email
+        }
       };
 
-      console.log('Attempting to create booking with data:', JSON.stringify(bookingData, null, 2));
+      console.log('Attempting to create booking with data:', bookingData);
 
-      try {
-        const { data: booking, error: bookingError } = await supabase
-          .from('bookings')
-          .insert([bookingData])
-          .select()
-          .single();
+      const { data: booking, error: bookingError } = await supabase
+        .from('bookings')
+        .insert(bookingData)
+        .select('*')
+        .single();
 
-        console.log('New booking created:', {
-          booking,
-          error: bookingError,
-          status: booking?.status,
-          cleaning_date: booking?.cleaning_date,
-          details: booking?.details
-        });
-
-        // Verify it exists immediately after creation
-        const { data: verifyBooking, error: verifyError } = await supabase
-          .from('bookings')
-          .select('*')
-          .eq('id', booking.id)
-          .single();
-
-        console.log('Booking verification:', {
-          exists: !!verifyBooking,
-          booking: verifyBooking,
-          error: verifyError
-        });
-
-        if (bookingError) {
-          throw bookingError;
-        }
-
-        console.log('Booking created successfully:', booking);
-
-        // Get admin users
-        const { data: adminUsers, error: adminError } = await supabase
-          .from('staff')
-          .select('email')
-          .eq('role', 'supervisor');
-
-        console.log('Admin users query result:', { adminUsers, adminError });
-
-        if (adminError) {
-          console.error('Error fetching admin users:', adminError);
-          throw adminError;
-        }
-
-        // First get the auth user IDs for these staff members
-        for (const admin of (adminUsers || [])) {
-          // Use RPC function or a view to get user ID
-          const { data: userData, error: userError } = await supabase
-            .rpc('get_user_id_by_email', { email_input: admin.email });
-          
-          if (userError) {
-            console.error('Error finding user for email:', admin.email, userError);
-            continue;
-          }
-
-          if (userData) {
-            console.log('Creating notification for user:', userData);
-            await createNotification(
-              userData,  // The function should return just the UUID
-              'New Booking',
-              `New ${bookingData.details.package} booking for ${bookingData.cleaning_date}`,
-              'system',
-              `/admin/dashboard`
-            );
-          }
-        }
-
-        // Generate tasks based on service type and selected rooms
-        const generateTasks = () => {
-          const commonTasks = [
-            { name: 'Initial walkthrough and inspection', order: 1 },
-            { name: 'Setup cleaning equipment and supplies', order: 2 },
-          ];
-          
-          const finalTasks = [
-            { name: 'Final inspection', order: 98 },
-            { name: 'Client walkthrough and feedback', order: 99 },
-            { name: 'Pack up and ensure all areas are secure', order: 100 }
-          ];
-          
-          let serviceTasks = [];
-          
-          if (selectedPackage === 'breatheEasy') {
-            // Add room-specific tasks based on the rooms selected
-            if (parseInt(formData.bedrooms) > 0) {
-              serviceTasks.push(
-                { name: `Clean and dust ${formData.bedrooms} bedroom(s)`, order: 10 },
-                { name: 'Make beds and organize bedroom areas', order: 11 }
-              );
-            }
-            
-            if (parseInt(formData.bathrooms) > 0 || parseInt(formData.halfBathrooms) > 0) {
-              serviceTasks.push(
-                { name: `Clean ${formData.bathrooms} full bath(s) and ${formData.halfBathrooms} half bath(s)`, order: 20 },
-                { name: 'Sanitize bathroom fixtures and surfaces', order: 21 },
-                { name: 'Clean mirrors and glass surfaces', order: 22 }
-              );
-            }
-            
-            if (parseInt(formData.kitchens) > 0) {
-              serviceTasks.push(
-                { name: 'Clean and sanitize kitchen counters and surfaces', order: 30 },
-                { name: 'Clean appliance exteriors', order: 31 },
-                { name: 'Clean and shine sink area', order: 32 }
-              );
-            }
-            
-            if (parseInt(formData.livingRooms) > 0 || parseInt(formData.bonusRooms) > 0) {
-              serviceTasks.push(
-                { name: 'Dust and clean living spaces', order: 40 },
-                { name: 'Vacuum upholstery and furniture', order: 41 }
-              );
-            }
-            
-            // Add service-specific tasks
-            if (formData.serviceSelection === 'deepCleaning') {
-              serviceTasks.push(
-                { name: 'Deep clean baseboards and trim', order: 50 },
-                { name: 'Clean window sills and tracks', order: 51 },
-                { name: 'Clean light fixtures and ceiling fans', order: 52 }
-              );
-            }
-            
-            if (formData.serviceSelection === 'moveInOutCleaning') {
-              serviceTasks.push(
-                { name: 'Clean inside cabinets and drawers', order: 60 },
-                { name: 'Clean inside appliances', order: 61 },
-                { name: 'Clean window tracks and sills', order: 62 },
-                { name: 'Clean all light fixtures', order: 63 }
-              );
-            }
-          } else if (selectedPackage === 'blockCleaning') {
-            serviceTasks = [
-              { name: 'Review client requirements and priorities', order: 10 },
-              { name: `Assign areas to ${formData.cleaners} cleaner(s)`, order: 11 },
-              { name: 'Clean assigned areas', order: 20 },
-              { name: 'Track time and progress', order: 21 },
-              { name: `Complete ${formData.hours}-hour cleaning block`, order: 90 }
-            ];
-          }
-          
-          // Combine all tasks and sort by order
-          return [...commonTasks, ...serviceTasks, ...finalTasks]
-            .sort((a, b) => a.order - b.order)
-            .map(task => ({
-              booking_id: booking.id,
-              task_name: task.name,
-              is_completed: false,
-              created_at: new Date().toISOString()
-            }));
-        };
-
-        const tasksToInsert = generateTasks();
-
-        console.log('Creating tasks:', tasksToInsert);
-
-        const { data: tasksData, error: tasksError } = await supabase
-          .from('checklists')
-          .insert(tasksToInsert)
-          .select();
-
-        if (tasksError) {
-          console.error('Error creating tasks:', tasksError);
-          throw tasksError;
-        }
-
-        console.log('Tasks created:', tasksData);
-
-        setCurrentBookingId(booking.id);
-        setShowPayment(true);
-        
-      } catch (insertError) {
-        console.error('Booking insertion error:', {
-          error: insertError,
-          message: insertError.message,
-          details: insertError.details,
-          hint: insertError.hint,
-          code: insertError.code,
-          data: bookingData
-        });
-        throw insertError;
+      if (bookingError) {
+        console.error('Detailed booking error:', bookingError);
+        throw bookingError;
       }
+
+      console.log('Supabase response:', { booking, bookingError });
+
+      if (!booking) {
+        console.error('No booking returned from database');
+        throw new Error('No booking ID returned from database');
+      }
+
+      const createdBooking = booking;
+      console.log('Successfully created booking:', createdBooking);
+
+      // Generate tasks for the booking
+      await generateTasks(createdBooking.id, selectedPackage, formData);
+
+      // Set the current booking ID for payment
+      setCurrentBookingId(createdBooking.id);
+      setShowPayment(true);
+
     } catch (error) {
-      console.error('Top level error:', {
-        error,
-        message: error.message,
-        stack: error.stack
-      });
-      showNotification('Failed to create booking: ' + error.message, 'error');
+      console.error('Error creating booking:', error);
+      showNotification('Error creating booking: ' + error.message, 'error');
     } finally {
       setLoading(false);
     }
+  };
+
+  // Add these functions before the generateTasks function
+
+  const generateBreatheEasyTasks = (bookingId, formData) => {
+    const tasks = [];
+
+    // Add room-specific tasks
+    if (parseInt(formData.bedrooms) > 0) {
+      tasks.push(
+        { booking_id: bookingId, task_name: 'Make beds and change linens (if provided)', is_completed: false },
+        { booking_id: bookingId, task_name: 'Dust all bedroom surfaces and furniture', is_completed: false },
+        { booking_id: bookingId, task_name: 'Vacuum bedroom floors and under furniture', is_completed: false },
+        { booking_id: bookingId, task_name: 'Clean bedroom mirrors and windows', is_completed: false }
+      );
+    }
+
+    if (parseInt(formData.bathrooms) > 0) {
+      tasks.push(
+        { booking_id: bookingId, task_name: 'Clean and sanitize toilet', is_completed: false },
+        { booking_id: bookingId, task_name: 'Clean and sanitize shower/tub', is_completed: false },
+        { booking_id: bookingId, task_name: 'Clean bathroom sink and counters', is_completed: false },
+        { booking_id: bookingId, task_name: 'Clean bathroom mirrors and fixtures', is_completed: false },
+        { booking_id: bookingId, task_name: 'Mop bathroom floor', is_completed: false }
+      );
+    }
+
+    if (parseInt(formData.halfBathrooms) > 0) {
+      tasks.push(
+        { booking_id: bookingId, task_name: 'Clean and sanitize half-bath toilet', is_completed: false },
+        { booking_id: bookingId, task_name: 'Clean half-bath sink and counter', is_completed: false },
+        { booking_id: bookingId, task_name: 'Clean half-bath mirror and fixtures', is_completed: false },
+        { booking_id: bookingId, task_name: 'Mop half-bath floor', is_completed: false }
+      );
+    }
+
+    if (parseInt(formData.kitchens) > 0) {
+      tasks.push(
+        { booking_id: bookingId, task_name: 'Clean and sanitize kitchen counters', is_completed: false },
+        { booking_id: bookingId, task_name: 'Clean stovetop and exterior of oven', is_completed: false },
+        { booking_id: bookingId, task_name: 'Clean exterior of refrigerator', is_completed: false },
+        { booking_id: bookingId, task_name: 'Clean and sanitize sink', is_completed: false },
+        { booking_id: bookingId, task_name: 'Clean small appliances exteriors', is_completed: false },
+        { booking_id: bookingId, task_name: 'Sweep and mop kitchen floor', is_completed: false }
+      );
+    }
+
+    if (parseInt(formData.livingRooms) > 0) {
+      tasks.push(
+        { booking_id: bookingId, task_name: 'Dust all living room surfaces and decor', is_completed: false },
+        { booking_id: bookingId, task_name: 'Clean windows and mirrors', is_completed: false },
+        { booking_id: bookingId, task_name: 'Vacuum upholstered furniture', is_completed: false },
+        { booking_id: bookingId, task_name: 'Vacuum and edge living room floors', is_completed: false }
+      );
+    }
+
+    if (parseInt(formData.bonusRooms) > 0) {
+      tasks.push(
+        { booking_id: bookingId, task_name: 'Dust all surfaces in bonus room', is_completed: false },
+        { booking_id: bookingId, task_name: 'Clean windows and mirrors', is_completed: false },
+        { booking_id: bookingId, task_name: 'Vacuum bonus room floors', is_completed: false }
+      );
+    }
+
+    if (parseInt(formData.laundryRooms) > 0) {
+      tasks.push(
+        { booking_id: bookingId, task_name: 'Clean exterior of washer and dryer', is_completed: false },
+        { booking_id: bookingId, task_name: 'Clean laundry sink if present', is_completed: false },
+        { booking_id: bookingId, task_name: 'Sweep and mop laundry room floor', is_completed: false }
+      );
+    }
+
+    if (parseInt(formData.offices) > 0) {
+      tasks.push(
+        { booking_id: bookingId, task_name: 'Dust office desk and furniture', is_completed: false },
+        { booking_id: bookingId, task_name: 'Clean office windows and surfaces', is_completed: false },
+        { booking_id: bookingId, task_name: 'Vacuum office floor', is_completed: false }
+      );
+    }
+
+    return tasks;
+  };
+
+  const generateBlockCleaningTasks = (bookingId, formData) => {
+    return [
+      { booking_id: bookingId, task_name: 'General cleaning of specified areas', is_completed: false },
+      { booking_id: bookingId, task_name: `${formData.cleaners} cleaner(s) for ${formData.hours} hour(s)`, is_completed: false },
+      { booking_id: bookingId, task_name: 'Clean and organize as per client instructions', is_completed: false }
+    ];
+  };
+
+  // Helper function to generate tasks
+  const generateTasks = (bookingId, packageType, formData) => {
+    const commonTasks = [
+      { booking_id: bookingId, task_name: 'Initial walkthrough and inspection', is_completed: false },
+      { booking_id: bookingId, task_name: 'Setup cleaning equipment and supplies', is_completed: false }
+    ];
+
+    const serviceTasks = packageType === 'breatheEasy' 
+      ? generateBreatheEasyTasks(bookingId, formData)
+      : generateBlockCleaningTasks(bookingId, formData);
+
+    const finalTasks = [
+      { booking_id: bookingId, task_name: 'Final inspection', is_completed: false },
+      { booking_id: bookingId, task_name: 'Client walkthrough and feedback', is_completed: false }
+    ];
+
+    return [...commonTasks, ...serviceTasks, ...finalTasks];
   };
 
   const handlePaymentSuccess = () => {
@@ -494,6 +486,16 @@ function QuoteCalculator() {
       console.error('Error signing out:', error);
     }
   };
+
+  // Add this useEffect to track currentBookingId changes
+  useEffect(() => {
+    console.log('currentBookingId changed:', currentBookingId);
+  }, [currentBookingId]);
+
+  // Add this useEffect to track showPayment changes
+  useEffect(() => {
+    console.log('showPayment changed:', showPayment);
+  }, [showPayment]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -754,73 +756,77 @@ function QuoteCalculator() {
               </button>
             ) : (
               <div className="booking-form">
-                <div className="form-group">
-                  <label htmlFor="bookingDate">Preferred Date</label>
-                  <input
-                    type="date"
-                    id="bookingDate"
-                    value={bookingDate}
-                    onChange={(e) => setBookingDate(e.target.value)}
-                    min={new Date().toISOString().split('T')[0]}
-                    required
-                  />
-                </div>
+                <div className="space-y-4 bg-[#2A3746] p-4 rounded-md">
+                  <div className="form-group">
+                    <label htmlFor="bookingDate" className="text-secondary">Preferred Date</label>
+                    <input
+                      type="date"
+                      id="bookingDate"
+                      value={bookingDate}
+                      onChange={(e) => setBookingDate(e.target.value)}
+                      min={new Date().toISOString().split('T')[0]}
+                      className="w-full bg-transparent border-none text-primary focus:outline-none focus:ring-2 focus:ring-gold"
+                      required
+                    />
+                  </div>
 
-                <div className="form-group">
-                  <label htmlFor="bookingTime">Preferred Time</label>
-                  <input
-                    type="time"
-                    id="bookingTime"
-                    value={bookingTime}
-                    onChange={(e) => setBookingTime(e.target.value)}
-                    required
-                  />
+                  <div className="form-group">
+                    <label htmlFor="bookingTime" className="text-secondary">Preferred Time</label>
+                    <input
+                      type="time"
+                      id="bookingTime"
+                      value={bookingTime}
+                      onChange={(e) => setBookingTime(e.target.value)}
+                      className="w-full bg-transparent border-none text-primary focus:outline-none focus:ring-2 focus:ring-gold"
+                      required
+                    />
+                  </div>
                 </div>
 
                 <div className="address-section mt-6 border-t border-border pt-6">
                   <h3 className="text-gold font-semibold mb-4">Service Location</h3>
                   
-                  <div className="space-y-4">
+                  <div className="space-y-4 bg-[#2A3746] p-4 rounded-md">
                     <div className="form-group">
-                      <label htmlFor="street">Street Address</label>
+                      <label htmlFor="street" className="text-secondary">Street Address</label>
                       <input
                         type="text"
                         id="street"
                         value={address.street}
                         onChange={(e) => setAddress({ ...address, street: e.target.value })}
                         placeholder="e.g. 3597 E Monarch Sky Lane"
-                        className="w-full"
+                        className="w-full bg-transparent border-none text-primary focus:outline-none focus:ring-2 focus:ring-gold"
                         required
                       />
                     </div>
 
                     <div className="grid grid-cols-12 gap-4">
                       <div className="form-group col-span-6">
-                        <label htmlFor="city">City</label>
+                        <label htmlFor="city" className="text-secondary">City</label>
                         <input
                           type="text"
                           id="city"
                           value={address.city}
                           onChange={(e) => setAddress({ ...address, city: e.target.value })}
-                          className="w-full"
+                          className="w-full bg-transparent border-none text-primary focus:outline-none focus:ring-2 focus:ring-gold"
                           required
                         />
                       </div>
 
                       <div className="form-group col-span-3">
-                        <label htmlFor="state">State</label>
+                        <label htmlFor="state" className="text-secondary">State</label>
                         <input
                           type="text"
                           id="state"
                           value={address.state}
                           onChange={(e) => setAddress({ ...address, state: e.target.value })}
-                          className="w-full"
+                          className="w-full bg-transparent border-none text-primary focus:outline-none focus:ring-2 focus:ring-gold"
                           required
                         />
                       </div>
 
                       <div className="form-group col-span-3">
-                        <label htmlFor="zipCode">ZIP Code</label>
+                        <label htmlFor="zipCode" className="text-secondary">ZIP Code</label>
                         <input
                           type="text"
                           id="zipCode"
@@ -831,7 +837,7 @@ function QuoteCalculator() {
                           }}
                           placeholder="83642"
                           maxLength="5"
-                          className="w-full"
+                          className="w-full bg-transparent border-none text-primary focus:outline-none focus:ring-2 focus:ring-gold"
                           required
                         />
                       </div>
@@ -880,14 +886,14 @@ function QuoteCalculator() {
           </div>
         )}
 
-        {showPayment && (
+        {showPayment && currentBookingId && (
           <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50">
             <div className="fixed inset-x-0 top-1/2 -translate-y-1/2 max-w-md mx-auto p-6">
               <div className="bg-container border border-border rounded-lg p-6">
                 <h2 className="text-xl font-semibold text-gold mb-4">Complete Payment</h2>
                 <PaymentForm
                   bookingId={currentBookingId}
-                  amount={quoteResult.price * 100} // Convert to cents
+                  amount={quoteResult?.price * 100} // Convert to cents
                   onPaymentSuccess={handlePaymentSuccess}
                 />
               </div>
