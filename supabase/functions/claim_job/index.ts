@@ -1,32 +1,89 @@
-// Follow this setup guide to integrate the Deno language server with your editor:
-// https://deno.land/manual/getting_started/setup_your_environment
-// This enables autocomplete, go to definition, etc.
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// Setup type definitions for built-in Supabase Runtime APIs
-import "jsr:@supabase/functions-js/edge-runtime.d.ts"
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
 
-console.log("Hello from Functions!")
-
-Deno.serve(async (req) => {
-  const { name } = await req.json()
-  const data = {
-    message: `Hello ${name}!`,
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
   }
 
-  return new Response(
-    JSON.stringify(data),
-    { headers: { "Content-Type": "application/json" } },
-  )
-})
+  try {
+    const { booking_id, staff_id } = await req.json()
+    
+    // Create a Supabase client with the Auth context of the logged in user
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+    )
 
-/* To invoke locally:
+    // First verify the booking is still available
+    const { data: booking, error: checkError } = await supabaseClient
+      .from('bookings')
+      .select('*')
+      .eq('id', booking_id)
+      .eq('status', 'unassigned')
+      .single()
 
-  1. Run `supabase start` (see: https://supabase.com/docs/reference/cli/supabase-start)
-  2. Make an HTTP request:
+    if (checkError || !booking) {
+      return new Response(
+        JSON.stringify({ error: 'This job is no longer available' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      )
+    }
 
-  curl -i --location --request POST 'http://127.0.0.1:54321/functions/v1/claim_job' \
-    --header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0' \
-    --header 'Content-Type: application/json' \
-    --data '{"name":"Functions"}'
+    // Start a transaction by updating the booking status first
+    const { error: updateError } = await supabaseClient
+      .from('bookings')
+      .update({
+        status: 'pending',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', booking_id)
+      .eq('status', 'unassigned') // Double check it's still unassigned
 
-*/
+    if (updateError) {
+      throw updateError
+    }
+
+    // Create staff schedule
+    const { error: scheduleError } = await supabaseClient
+      .from('staff_schedules')
+      .insert({
+        staff_id: staff_id,
+        booking_id: booking_id,
+        start_time: booking.cleaning_date,
+        end_time: new Date(new Date(booking.cleaning_date).getTime() + 
+          (booking.details.rooms?.hours || 2) * 60 * 60 * 1000).toISOString(),
+        status: 'scheduled'
+      })
+
+    if (scheduleError) {
+      // If schedule creation fails, try to revert the booking status
+      await supabaseClient
+        .from('bookings')
+        .update({
+          status: 'unassigned',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', booking_id)
+      
+      throw scheduleError
+    }
+
+    return new Response(
+      JSON.stringify({ success: true, data: booking }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+    )
+
+  } catch (error) {
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+    )
+  }
+}) 
