@@ -6,16 +6,6 @@ import { useNotification } from '../contexts/NotificationContext';
 import { useNotificationSystem } from '../contexts/NotificationSystemContext';
 import PaymentForm from '../components/PaymentForm';
 
-// Add this array at the top of the file, outside the component
-const TREASURE_VALLEY_ZIP_CODES = [
-  '83642', // Meridian
-  '83646', // Meridian
-  '83680', // Meridian
-  '83669', // Meridian
-  '83643', // Meridian
-  '83687', // Meridian
-];
-
 // Base prices for different cleaning types (hourly rates)
 const standardCleaning = 45;  // $45/hr
 const deepCleaning = 63;      // $63/hr
@@ -44,7 +34,7 @@ const dirtinessMultipliers = {
 
 function QuoteCalculator() {
   const navigate = useNavigate();
-  const { user, signOut } = useAuth();
+  const { user, signOut, profile } = useAuth();
   const [selectedPackage, setSelectedPackage] = useState('');
   const [quoteResult, setQuoteResult] = useState(null);
   const [formData, setFormData] = useState({
@@ -71,8 +61,8 @@ function QuoteCalculator() {
   const { showNotification } = useNotification();
   const [address, setAddress] = useState({
     street: '',
-    city: 'Meridian',
-    state: 'ID',
+    city: '',
+    state: '',
     zipCode: ''
   });
   const { createNotification } = useNotificationSystem();
@@ -152,12 +142,11 @@ function QuoteCalculator() {
   };
 
   const geocodeAddress = async () => {
-    const addressString = `${address.street}, ${address.city || 'Meridian'}, ${address.state || 'ID'} ${address.zipCode}, USA`;
+    const addressString = `${address.street}, ${address.city}, ${address.state} ${address.zipCode}, USA`;
     try {
       console.log('Geocoding address:', addressString);
       console.log('Using API key:', process.env.REACT_APP_GOOGLE_MAPS_API_KEY);
       
-      // Add error handling for missing API key
       if (!process.env.REACT_APP_GOOGLE_MAPS_API_KEY) {
         console.error('Google Maps API key is missing');
         showNotification('System configuration error. Please contact support.', 'error');
@@ -165,7 +154,7 @@ function QuoteCalculator() {
       }
 
       const response = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(addressString)}&region=us&components=administrative_area:ID&key=${process.env.REACT_APP_GOOGLE_MAPS_API_KEY}`
+        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(addressString)}&region=us&key=${process.env.REACT_APP_GOOGLE_MAPS_API_KEY}`
       );
 
       if (!response.ok) {
@@ -177,7 +166,7 @@ function QuoteCalculator() {
       console.log('Raw API Response:', data);
       
       if (data.status === 'ZERO_RESULTS') {
-        showNotification('Could not find this address in the Meridian area. Please check the address and try again.', 'error');
+        showNotification('Could not find this address. Please check the address and try again.', 'error');
         return null;
       }
 
@@ -187,17 +176,7 @@ function QuoteCalculator() {
       }
       
       if (data.results && data.results[0]) {
-        // Verify the address is in the Meridian area
-        const location = data.results[0].geometry.location;
-        const isInMeridianArea = data.results[0].formatted_address.toLowerCase().includes('meridian') ||
-                                data.results[0].formatted_address.toLowerCase().includes('idaho');
-        
-        if (!isInMeridianArea) {
-          showNotification('Sorry, we only service the Meridian, Idaho area at this time.', 'error');
-          return null;
-        }
-
-        return location;
+        return data.results[0].geometry.location;
       }
 
       showNotification('Could not find this address. Please check the address and try again.', 'error');
@@ -227,14 +206,10 @@ function QuoteCalculator() {
       return false;
     }
 
-    // Validate zip code for Treasure Valley
-    if (!TREASURE_VALLEY_ZIP_CODES.includes(address.zipCode)) {
-      showNotification(
-        'Sorry, we currently only service the Meridian area (ZIP codes: ' + 
-        TREASURE_VALLEY_ZIP_CODES.join(', ') + 
-        '). More locations coming soon!', 
-        'error'
-      );
+    // Validate ZIP code format (5 digits)
+    const zipCodeRegex = /^\d{5}$/;
+    if (!zipCodeRegex.test(address.zipCode)) {
+      showNotification('Please enter a valid 5-digit ZIP code', 'error');
       return false;
     }
 
@@ -313,7 +288,9 @@ function QuoteCalculator() {
             zipCode: address.zipCode,
             coordinates: coordinates
           },
-          client_email: authUser.email
+          client_email: authUser.email,
+          client_name: profile?.name,
+          client_phone: profile?.phone
         }
       };
 
@@ -503,7 +480,7 @@ function QuoteCalculator() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="text-gold">
-              {user && `Welcome, ${user.email}`}
+              {user && `Welcome, ${profile?.name || user.email}`}
             </div>
             <div className="flex items-center gap-4">
               <button
@@ -808,6 +785,7 @@ function QuoteCalculator() {
                           id="city"
                           value={address.city}
                           onChange={(e) => setAddress({ ...address, city: e.target.value })}
+                          placeholder="Enter city"
                           className="w-full bg-transparent border-none text-primary focus:outline-none focus:ring-2 focus:ring-gold"
                           required
                         />
