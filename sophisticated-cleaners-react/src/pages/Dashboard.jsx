@@ -6,7 +6,7 @@ import { supabase } from '../lib/supabaseClient';
 
 function Dashboard() {
   const navigate = useNavigate();
-  const { user, signOut } = useAuth();
+  const { user, signOut, profile } = useAuth();
   const { showNotification } = useNotification();
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -112,7 +112,7 @@ function Dashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-4">
-              <span className="text-gold">Welcome, {user.email}</span>
+              <span className="text-gold">Welcome, {profile?.name || user.email}</span>
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}

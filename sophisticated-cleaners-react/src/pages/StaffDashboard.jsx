@@ -804,10 +804,19 @@ function StaffDashboard() {
                           <h3 className="text-gold font-semibold mb-2">Client Information</h3>
                           <div className="grid grid-cols-2 gap-4">
                             <div className="form-group">
+                              <label className="text-secondary">Name</label>
+                              <input
+                                type="text"
+                                value={booking.details.client_name || 'Not provided'}
+                                readOnly
+                                className="w-full bg-input border border-border rounded px-3 py-2 text-primary focus:outline-none focus:border-gold"
+                              />
+                            </div>
+                            <div className="form-group">
                               <label className="text-secondary">Email</label>
                               <input
                                 type="text"
-                                value={booking.client_email}
+                                value={booking.details.client_email}
                                 readOnly
                                 className="w-full bg-input border border-border rounded px-3 py-2 text-primary focus:outline-none focus:border-gold"
                               />
@@ -816,7 +825,7 @@ function StaffDashboard() {
                               <label className="text-secondary">Phone</label>
                               <input
                                 type="text"
-                                value={booking.client_phone || 'Not provided'}
+                                value={booking.details.client_phone || 'Not provided'}
                                 readOnly
                                 className="w-full bg-input border border-border rounded px-3 py-2 text-primary focus:outline-none focus:border-gold"
                               />

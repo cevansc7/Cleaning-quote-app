@@ -8,6 +8,8 @@ function Register() {
     email: '',
     password: '',
     confirmPassword: '',
+    name: '',
+    phone: '',
     role: 'client' // default role
   });
   const [loading, setLoading] = useState(false);
@@ -25,7 +27,8 @@ function Register() {
       setLoading(true);
       setError(null);
       
-      const { error } = await supabase.auth.signUp({
+      // Sign up the user
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
@@ -35,13 +38,27 @@ function Register() {
         }
       });
 
-      if (error) throw error;
+      if (authError) throw authError;
+
+      // Create the profile
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert([
+          {
+            id: authData.user.id,
+            name: formData.name,
+            phone: formData.phone
+          }
+        ]);
+
+      if (profileError) throw profileError;
 
       // Registration successful
       alert('Registration successful! Please check your email for verification.');
       navigate('/login');
       
     } catch (error) {
+      console.error('Registration error:', error);
       setError(error.message);
     } finally {
       setLoading(false);
@@ -57,6 +74,32 @@ function Register() {
         
         <form onSubmit={handleSubmit} className="auth-form">
           <div className="form-group">
+            <label htmlFor="name">Full Name</label>
+            <input
+              type="text"
+              id="name"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              required
+              className="w-full bg-input border border-border rounded px-3 py-2 text-primary focus:outline-none focus:border-gold"
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="phone">Phone Number</label>
+            <input
+              type="tel"
+              id="phone"
+              value={formData.phone}
+              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              required
+              pattern="[0-9]{3}[0-9]{3}[0-9]{4}"
+              placeholder="1234567890"
+              className="w-full bg-input border border-border rounded px-3 py-2 text-primary focus:outline-none focus:border-gold"
+            />
+          </div>
+
+          <div className="form-group">
             <label htmlFor="email">Email</label>
             <input
               type="email"
@@ -64,6 +107,7 @@ function Register() {
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               required
+              className="w-full bg-input border border-border rounded px-3 py-2 text-primary focus:outline-none focus:border-gold"
             />
           </div>
 
@@ -75,6 +119,7 @@ function Register() {
               value={formData.password}
               onChange={(e) => setFormData({ ...formData, password: e.target.value })}
               required
+              className="w-full bg-input border border-border rounded px-3 py-2 text-primary focus:outline-none focus:border-gold"
             />
           </div>
 
@@ -86,6 +131,7 @@ function Register() {
               value={formData.confirmPassword}
               onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
               required
+              className="w-full bg-input border border-border rounded px-3 py-2 text-primary focus:outline-none focus:border-gold"
             />
           </div>
 
@@ -95,19 +141,24 @@ function Register() {
               id="role"
               value={formData.role}
               onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+              className="w-full bg-input border border-border rounded px-3 py-2 text-primary focus:outline-none focus:border-gold"
             >
               <option value="client">Client</option>
               <option value="staff">Staff</option>
             </select>
           </div>
 
-          <button type="submit" className="btn" disabled={loading}>
+          <button
+            type="submit"
+            className="btn w-full bg-gold hover:bg-gold-dark text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+            disabled={loading}
+          >
             {loading ? 'Creating Account...' : 'Register'}
           </button>
         </form>
 
-        <p className="auth-link">
-          Already have an account? <Link to="/login">Login</Link>
+        <p className="auth-link mt-4 text-center">
+          Already have an account? <Link to="/login" className="text-gold hover:text-gold-dark">Login</Link>
         </p>
       </div>
     </div>
