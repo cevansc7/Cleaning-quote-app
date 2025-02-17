@@ -17,7 +17,7 @@ function Register() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (formData.password !== formData.confirmPassword) {
       setError("Passwords don't match");
       return;
@@ -26,7 +26,7 @@ function Register() {
     try {
       setLoading(true);
       setError(null);
-      
+
       // Sign up the user
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
@@ -40,23 +40,39 @@ function Register() {
 
       if (authError) throw authError;
 
+      if (!authData.user) {
+        throw new Error('No user data returned from signup');
+      }
+
+      // Wait a moment for the user to be fully created
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Refresh the schema cache before inserting
+      await supabase.schema('public').refresh();
+
       // Create the profile
       const { error: profileError } = await supabase
         .from('profiles')
         .insert([
           {
             id: authData.user.id,
+            email: formData.email,
             name: formData.name,
-            phone: formData.phone
+            phone: formData.phone,
+            role: formData.role
           }
-        ]);
+        ])
+        .select();
 
-      if (profileError) throw profileError;
+      if (profileError) {
+        console.error('Profile creation error:', profileError);
+        throw profileError;
+      }
 
       // Registration successful
       alert('Registration successful! Please check your email for verification.');
       navigate('/login');
-      
+
     } catch (error) {
       console.error('Registration error:', error);
       setError(error.message);
@@ -69,9 +85,9 @@ function Register() {
     <div className="min-h-screen bg-background flex items-center justify-center">
       <div className="auth-container">
         <h2>Create Account</h2>
-        
+
         {error && <div className="error-message">{error}</div>}
-        
+
         <form onSubmit={handleSubmit} className="auth-form">
           <div className="form-group">
             <label htmlFor="name">Full Name</label>
