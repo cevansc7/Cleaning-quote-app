@@ -1,11 +1,12 @@
 import { supabase } from '../lib/supabaseClient';
 
-export async function addStaffMember(email, name = null, role = 'cleaner') {
+export async function addStaffMember(email, name = null, phone = null, role = 'cleaner') {
   try {
     // Call the RPC function
     const { data, error } = await supabase.rpc('add_staff_member', {
       user_email: email,
       user_name: name,
+      user_phone: phone,
       staff_role: role
     });
 
@@ -13,7 +14,11 @@ export async function addStaffMember(email, name = null, role = 'cleaner') {
 
     // Update user metadata
     const { error: updateError } = await supabase.auth.updateUser({
-      data: { role: 'staff' }
+      data: {
+        role: 'staff',
+        name: name,
+        phone: phone
+      }
     });
 
     if (updateError) throw updateError;

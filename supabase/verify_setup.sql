@@ -88,3 +88,36 @@ FROM information_schema.table_constraints AS tc
     JOIN information_schema.constraint_column_usage AS ccu ON ccu.constraint_name = tc.constraint_name
 WHERE tc.constraint_type = 'FOREIGN KEY'
     AND tc.table_schema = 'public';
+-- Call add_staff_member function to ensure proper setup
+SELECT add_staff_member(
+        'brickev@hotmail.com',
+        'David Banner',
+        'cleaner'
+    );
+-- Verify all records
+SELECT 'auth.users' as source,
+    id,
+    email,
+    raw_user_meta_data->>'role' as role,
+    raw_user_meta_data->>'name' as name,
+    raw_user_meta_data->>'phone' as phone
+FROM auth.users
+WHERE email = 'brickev@hotmail.com'
+UNION ALL
+SELECT 'profiles' as source,
+    id,
+    email,
+    role,
+    name,
+    phone
+FROM profiles
+WHERE email = 'brickev@hotmail.com'
+UNION ALL
+SELECT 'staff' as source,
+    user_id as id,
+    email,
+    role,
+    name,
+    phone
+FROM staff
+WHERE email = 'brickev@hotmail.com';

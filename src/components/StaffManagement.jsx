@@ -22,11 +22,25 @@ function StaffManagement() {
     try {
       const { data, error } = await supabase
         .from('staff')
-        .select('*')
+        .select(`
+          *,
+          profiles:user_id (
+            name,
+            phone
+          )
+        `)
         .order('name');
 
       if (error) throw error;
-      setStaff(data || []);
+
+      // Map the data to include profile information
+      const staffWithProfiles = data?.map(staff => ({
+        ...staff,
+        name: staff.profiles?.name || staff.name,
+        phone: staff.profiles?.phone || staff.phone
+      })) || [];
+
+      setStaff(staffWithProfiles);
     } catch (error) {
       console.error('Error fetching staff:', error);
       showNotification('Error loading staff members', 'error');
@@ -35,14 +49,22 @@ function StaffManagement() {
     }
   };
 
-  const handleAddStaff = async (email, name, role) => {
+  const handleAddStaff = async (e) => {
+    e.preventDefault();
     try {
-      const result = await addStaffMember(email, name, role);
+      const result = await addStaffMember(newStaff.email, newStaff.name, newStaff.phone, newStaff.role);
       if (!result.success) {
         throw new Error(result.error);
       }
-      
+
       showNotification('Staff member added successfully', 'success');
+      // Reset form
+      setNewStaff({
+        name: '',
+        email: '',
+        phone: '',
+        role: 'cleaner'
+      });
       // Refresh staff list
       await fetchStaff();
     } catch (error) {
@@ -60,7 +82,7 @@ function StaffManagement() {
 
       if (error) throw error;
 
-      setStaff(staff.map(s => 
+      setStaff(staff.map(s =>
         s.id === staffId ? { ...s, status: newStatus } : s
       ));
       showNotification('Staff status updated', 'success');
@@ -153,9 +175,8 @@ function StaffManagement() {
                   <p className="text-secondary text-sm">{member.phone}</p>
                 </div>
                 <div className="flex items-center gap-4">
-                  <span className={`px-2 py-1 rounded text-sm ${
-                    member.status === 'active' ? 'bg-success/20 text-success' : 'bg-error/20 text-error'
-                  }`}>
+                  <span className={`px-2 py-1 rounded text-sm ${member.status === 'active' ? 'bg-success/20 text-success' : 'bg-error/20 text-error'
+                    }`}>
                     {member.status}
                   </span>
                   <button

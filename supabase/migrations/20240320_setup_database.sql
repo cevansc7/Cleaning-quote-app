@@ -121,3 +121,62 @@ END;
 $$;
 -- Grant execute permission to authenticated users
 GRANT EXECUTE ON FUNCTION setup_authorized_user TO authenticated;
+-- Create function to add staff member
+CREATE OR REPLACE FUNCTION add_staff_member(
+        user_email TEXT,
+        user_name TEXT,
+        user_phone TEXT,
+        staff_role TEXT DEFAULT 'cleaner'
+    ) RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$ BEGIN -- Get the user ID from auth.users
+DECLARE user_id UUID;
+BEGIN
+SELECT id INTO user_id
+FROM auth.users
+WHERE email = user_email;
+IF user_id IS NULL THEN RAISE EXCEPTION 'User not found with email %',
+user_email;
+END IF;
+-- Update user's metadata
+UPDATE auth.users
+SET raw_user_meta_data = jsonb_build_object(
+        'role',
+        'staff',
+        'name',
+        user_name,
+        'phone',
+        user_phone
+    )
+WHERE id = user_id;
+-- Insert or update profile
+INSERT INTO profiles (id, email, name, phone, role)
+VALUES (
+        user_id,
+        user_email,
+        user_name,
+        user_phone,
+        'staff'
+    ) ON CONFLICT (id) DO
+UPDATE
+SET name = EXCLUDED.name,
+    phone = EXCLUDED.phone,
+    role = 'staff',
+    updated_at = NOW();
+-- Insert or update staff record
+INSERT INTO staff (user_id, email, name, phone, role)
+VALUES (
+        user_id,
+        user_email,
+        user_name,
+        user_phone,
+        staff_role
+    ) ON CONFLICT (email) DO
+UPDATE
+SET name = EXCLUDED.name,
+    phone = EXCLUDED.phone,
+    role = staff_role,
+    updated_at = NOW();
+END;
+END;
+$$;
+-- Grant execute permission to authenticated users
+GRANT EXECUTE ON FUNCTION add_staff_member TO authenticated;
