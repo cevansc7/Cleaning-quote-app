@@ -12,6 +12,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import StaffDashboard from './pages/StaffDashboard';
 import ClientDashboard from './pages/ClientDashboard';
 import QuoteCalculator from './pages/QuoteCalculator';
+import Settings from './pages/Settings';
 import PrivateRoute from './components/PrivateRoute';
 
 // Remove the import of App.css if it exists
@@ -32,9 +33,19 @@ function App() {
                     <Route path="/login" element={<Login />} />
                     <Route path="/register" element={<Register />} />
 
+                    {/* Settings route - accessible to all authenticated users */}
+                    <Route
+                      path="/settings"
+                      element={
+                        <PrivateRoute>
+                          <Settings />
+                        </PrivateRoute>
+                      }
+                    />
+
                     {/* Dashboard route with role-based redirect */}
-                    <Route 
-                      path="/dashboard" 
+                    <Route
+                      path="/dashboard"
                       element={
                         <PrivateRoute>
                           {({ user }) => {
@@ -48,43 +59,43 @@ function App() {
                             return <Navigate to="/client/dashboard" replace />;
                           }}
                         </PrivateRoute>
-                      } 
+                      }
                     />
 
                     {/* Staff routes */}
-                    <Route 
-                      path="/staff/*" 
+                    <Route
+                      path="/staff/*"
                       element={
                         <PrivateRoute requireRole="staff">
                           <Routes>
                             <Route path="/dashboard" element={<StaffDashboard />} />
                           </Routes>
                         </PrivateRoute>
-                      } 
+                      }
                     />
 
                     {/* Client routes */}
-                    <Route 
-                      path="/client/*" 
+                    <Route
+                      path="/client/*"
                       element={
                         <PrivateRoute requireRole="client">
                           <Routes>
                             <Route path="/dashboard" element={<ClientDashboard />} />
                           </Routes>
                         </PrivateRoute>
-                      } 
+                      }
                     />
 
                     {/* Admin routes */}
-                    <Route 
-                      path="/admin/*" 
+                    <Route
+                      path="/admin/*"
                       element={
                         <PrivateRoute requireRole="admin">
                           <Routes>
                             <Route path="/dashboard" element={<AdminDashboard />} />
                           </Routes>
                         </PrivateRoute>
-                      } 
+                      }
                     />
                   </Routes>
                 </div>

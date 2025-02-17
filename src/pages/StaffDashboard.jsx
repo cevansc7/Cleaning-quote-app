@@ -67,7 +67,7 @@ function StaffDashboard() {
             return;
           }
         }
-        
+
         // Now check the role
         if (!staffMember || !user?.user_metadata?.role || user.user_metadata.role !== 'staff') {
           console.error('User does not have staff role:', user?.user_metadata?.role);
@@ -80,7 +80,7 @@ function StaffDashboard() {
         navigate('/login');
       }
     };
-    
+
     checkRole();
   }, [navigate, showNotification]);
 
@@ -89,12 +89,12 @@ function StaffDashboard() {
       try {
         const { data: { session }, error } = await supabase.auth.refreshSession();
         if (error) throw error;
-        
+
         console.log('Refreshed session:', {
           user: session?.user,
           role: session?.user?.user_metadata?.role
         });
-        
+
         // Force reload if role is missing
         if (!session?.user?.user_metadata?.role) {
           await supabase.auth.signOut();
@@ -133,13 +133,13 @@ function StaffDashboard() {
   const fetchBookings = useCallback(async () => {
     try {
       setLoading(true);
-      
+
       // First, get the bookings
       const { data: bookingsData, error: bookingsError } = await supabase
         .from('bookings')
         .select('*')
         .neq('status', 'cancelled')  // Always exclude cancelled bookings except in cancelled view
-        .eq('status', activeTab === 'unassigned' ? 'unassigned' : 
+        .eq('status', activeTab === 'unassigned' ? 'unassigned' :
           statusFilter === 'cancelled' ? 'cancelled' : statusFilter)
         .order('cleaning_date', { ascending: true });
 
@@ -175,7 +175,7 @@ function StaffDashboard() {
 
       // If we're looking for unassigned jobs, filter them
       if (activeTab === 'unassigned') {
-        const unassignedData = combinedData.filter(booking => 
+        const unassignedData = combinedData.filter(booking =>
           !booking.staff_schedules || booking.staff_schedules.length === 0
         );
         setBookings(unassignedData);
@@ -264,7 +264,7 @@ function StaffDashboard() {
       // Update the booking status
       const { error: updateError } = await supabase
         .from('bookings')
-        .update({ 
+        .update({
           status: newStatus,
           updated_at: new Date().toISOString()
         })
@@ -274,7 +274,7 @@ function StaffDashboard() {
 
       // Refresh the bookings list
       await fetchBookings();
-      
+
       showNotification(`Booking marked as ${newStatus}`, 'success');
 
     } catch (error) {
@@ -298,28 +298,28 @@ function StaffDashboard() {
     // Clear localStorage
     localStorage.removeItem('staffDashboardBookings');
     localStorage.removeItem('lastStatusFilter');
-    
+
     // Reset states
     setBookings([]);
     setStatusFilter('pending');
     setLastUpdate(Date.now());
-    
+
     // Force refresh
     fetchBookings();
-    
+
     showNotification('Dashboard data cleared', 'success');
   };
 
   const calculateStaffPay = (booking, role) => {
     const hourlyRate = role === 'supervisor' ? 20 : 18;
-    
+
     if (booking.details.package === 'blockCleaning') {
       return hourlyRate * booking.details.rooms.hours;
     } else {
       // For breatheEasy, calculate hours based on rooms
       let estimatedHours = 0;
       const rooms = booking.details.rooms;
-      
+
       // Base time for each room type
       estimatedHours += rooms.bedrooms * 0.5;     // 30 mins per bedroom
       estimatedHours += rooms.bathrooms * 0.75;    // 45 mins per bathroom
@@ -341,7 +341,7 @@ function StaffDashboard() {
     try {
       setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       // First verify the booking is still available with a lock
       const { data: booking, error: checkError } = await supabase
         .from('bookings')
@@ -382,8 +382,8 @@ function StaffDashboard() {
 
       // Calculate end time based on booking details
       const startTime = new Date(booking.cleaning_date);
-      const hours = booking.details.package === 'blockCleaning' 
-        ? booking.details.rooms.hours 
+      const hours = booking.details.package === 'blockCleaning'
+        ? booking.details.rooms.hours
         : 2; // Default to 2 hours for other packages
       const endTime = new Date(startTime.getTime() + hours * 60 * 60 * 1000);
 
@@ -409,11 +409,11 @@ function StaffDashboard() {
           })
           .eq('id', bookingId)
           .eq('status', 'pending');
-        
+
         if (revertError) {
           console.error('Error reverting booking status:', revertError);
         }
-        
+
         showNotification('Error claiming job - please try again', 'error');
         fetchUnassignedJobs();
         return;
@@ -436,7 +436,7 @@ function StaffDashboard() {
     try {
       setLoadingJobs(true);
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       // First, let's check all bookings to see what's available
       const { data: allBookings, error: allError } = await supabase
         .from('bookings')
@@ -566,7 +566,7 @@ function StaffDashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <span className="text-gold font-semibold">Staff Dashboard</span>
-            
+
             {/* Mobile menu button */}
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -581,45 +581,49 @@ function StaffDashboard() {
             <div className="hidden md:flex items-center space-x-8">
               <button
                 onClick={() => setActiveTab('bookings')}
-                className={`px-3 py-2 text-sm font-medium ${
-                  activeTab === 'bookings'
+                className={`px-3 py-2 text-sm font-medium ${activeTab === 'bookings'
                     ? 'text-gold border-b-2 border-gold'
                     : 'text-secondary hover:text-primary'
-                }`}
+                  }`}
               >
                 My Bookings
               </button>
               <button
                 onClick={() => setActiveTab('available')}
-                className={`px-3 py-2 text-sm font-medium ${
-                  activeTab === 'available'
+                className={`px-3 py-2 text-sm font-medium ${activeTab === 'available'
                     ? 'text-gold border-b-2 border-gold'
                     : 'text-secondary hover:text-primary'
-                }`}
+                  }`}
               >
                 Available Jobs
               </button>
               <button
                 onClick={() => setActiveTab('schedule')}
-                className={`px-3 py-2 text-sm font-medium ${
-                  activeTab === 'schedule'
+                className={`px-3 py-2 text-sm font-medium ${activeTab === 'schedule'
                     ? 'text-gold border-b-2 border-gold'
                     : 'text-secondary hover:text-primary'
-                }`}
+                  }`}
               >
                 Schedule
               </button>
               <button
                 onClick={() => setActiveTab('reviews')}
-                className={`px-3 py-2 text-sm font-medium ${
-                  activeTab === 'reviews'
+                className={`px-3 py-2 text-sm font-medium ${activeTab === 'reviews'
                     ? 'text-gold border-b-2 border-gold'
                     : 'text-secondary hover:text-primary'
-                }`}
+                  }`}
               >
                 Reviews
               </button>
-              
+
+              {/* Add settings button */}
+              <button
+                onClick={() => navigate('/settings')}
+                className="px-3 py-2 text-sm font-medium text-secondary hover:text-primary"
+              >
+                Settings
+              </button>
+
               {/* Add sign out button */}
               <button
                 onClick={handleSignOut}
@@ -638,11 +642,10 @@ function StaffDashboard() {
                   setActiveTab('bookings');
                   setIsMenuOpen(false);
                 }}
-                className={`px-3 py-2 text-sm font-medium ${
-                  activeTab === 'bookings'
+                className={`px-3 py-2 text-sm font-medium ${activeTab === 'bookings'
                     ? 'text-gold bg-container'
                     : 'text-secondary hover:text-primary'
-                }`}
+                  }`}
               >
                 My Bookings
               </button>
@@ -651,11 +654,10 @@ function StaffDashboard() {
                   setActiveTab('available');
                   setIsMenuOpen(false);
                 }}
-                className={`px-3 py-2 text-sm font-medium ${
-                  activeTab === 'available'
+                className={`px-3 py-2 text-sm font-medium ${activeTab === 'available'
                     ? 'text-gold bg-container'
                     : 'text-secondary hover:text-primary'
-                }`}
+                  }`}
               >
                 Available Jobs
               </button>
@@ -664,11 +666,10 @@ function StaffDashboard() {
                   setActiveTab('schedule');
                   setIsMenuOpen(false);
                 }}
-                className={`px-3 py-2 text-sm font-medium ${
-                  activeTab === 'schedule'
+                className={`px-3 py-2 text-sm font-medium ${activeTab === 'schedule'
                     ? 'text-gold bg-container'
                     : 'text-secondary hover:text-primary'
-                }`}
+                  }`}
               >
                 Schedule
               </button>
@@ -677,13 +678,23 @@ function StaffDashboard() {
                   setActiveTab('reviews');
                   setIsMenuOpen(false);
                 }}
-                className={`px-3 py-2 text-sm font-medium ${
-                  activeTab === 'reviews'
+                className={`px-3 py-2 text-sm font-medium ${activeTab === 'reviews'
                     ? 'text-gold bg-container'
                     : 'text-secondary hover:text-primary'
-                }`}
+                  }`}
               >
                 Reviews
+              </button>
+
+              {/* Add settings button */}
+              <button
+                onClick={() => {
+                  navigate('/settings');
+                  setIsMenuOpen(false);
+                }}
+                className="px-3 py-2 text-sm font-medium text-secondary hover:text-primary"
+              >
+                Settings
               </button>
 
               {/* Add divider and sign out button */}
@@ -741,15 +752,14 @@ function StaffDashboard() {
                             })}
                           </p>
                         </div>
-                        <span className={`px-3 py-1 rounded-full text-sm ${
-                          booking.status === 'completed' ? 'bg-success/20 text-success' :
-                          booking.status === 'pending' ? 'bg-gold/20 text-gold' :
-                          'bg-error/20 text-error'
-                        }`}>
+                        <span className={`px-3 py-1 rounded-full text-sm ${booking.status === 'completed' ? 'bg-success/20 text-success' :
+                            booking.status === 'pending' ? 'bg-gold/20 text-gold' :
+                              'bg-error/20 text-error'
+                          }`}>
                           {booking.status}
                         </span>
                       </div>
-                      
+
                       <div className="text-secondary mb-4">
                         <p>Service: {booking.details.package}</p>
                         {booking.details.package === 'blockCleaning' && (
@@ -855,12 +865,12 @@ function StaffDashboard() {
                       {/* Add the checklist component */}
                       {statusFilter === 'pending' && (
                         <div className="mt-4 border-t border-border pt-4">
-                          <CleaningChecklist 
-                            booking={booking} 
+                          <CleaningChecklist
+                            booking={booking}
                             onComplete={() => {
                               fetchBookings();
                               showNotification('Booking marked as complete!', 'success');
-                            }} 
+                            }}
                           />
                         </div>
                       )}

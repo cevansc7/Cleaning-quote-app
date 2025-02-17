@@ -42,7 +42,7 @@ function Dashboard() {
 
       const { error } = await supabase
         .from('bookings')
-        .update({ 
+        .update({
           status: 'cancelled',
           updated_at: new Date().toISOString()
         })
@@ -122,12 +122,20 @@ function Dashboard() {
                 <option value="cancelled">Cancelled Bookings</option>
               </select>
             </div>
-            <button
-              onClick={handleSignOut}
-              className="text-secondary hover:text-gold transition-colors"
-            >
-              Sign Out
-            </button>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => navigate('/settings')}
+                className="text-secondary hover:text-gold transition-colors"
+              >
+                Settings
+              </button>
+              <button
+                onClick={handleSignOut}
+                className="text-secondary hover:text-gold transition-colors"
+              >
+                Sign Out
+              </button>
+            </div>
           </div>
         </div>
       </nav>
@@ -170,11 +178,10 @@ function Dashboard() {
                       {new Date(booking.cleaning_date).toLocaleTimeString()}
                     </p>
                   </div>
-                  <span className={`px-3 py-1 rounded-full text-sm ${
-                    booking.status === 'completed' ? 'bg-success/20 text-success' :
-                    booking.status === 'pending' ? 'bg-gold/20 text-gold' :
-                    'bg-error/20 text-error'
-                  }`}>
+                  <span className={`px-3 py-1 rounded-full text-sm ${booking.status === 'completed' ? 'bg-success/20 text-success' :
+                      booking.status === 'pending' ? 'bg-gold/20 text-gold' :
+                        'bg-error/20 text-error'
+                    }`}>
                     {booking.status}
                   </span>
                 </div>
@@ -182,7 +189,7 @@ function Dashboard() {
                   <p>Service: {booking.details.package}</p>
                   <p>Price: ${booking.details.price}</p>
                 </div>
-                
+
                 {statusFilter === 'pending' && (
                   <button
                     onClick={() => cancelBooking(booking.id)}

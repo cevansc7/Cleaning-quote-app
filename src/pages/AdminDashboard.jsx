@@ -97,8 +97,8 @@ function AdminDashboard() {
       // Then apply status filter if needed
       let filteredBookings = allBookings || [];
       if (statusFilter !== 'all') {
-        filteredBookings = filteredBookings.filter(booking => 
-          statusFilter === 'cancelled' 
+        filteredBookings = filteredBookings.filter(booking =>
+          statusFilter === 'cancelled'
             ? booking.status === 'cancelled'
             : booking.status === statusFilter
         );
@@ -145,7 +145,7 @@ function AdminDashboard() {
       statusFilter,
       bookingsCount: bookings.length
     });
-    
+
     fetchBookings();
     if (activeTab === 'bookings') {
       fetchStaffMembers();
@@ -162,14 +162,14 @@ function AdminDashboard() {
         role: user?.user_metadata?.role,
         raw: user
       });
-      
+
       if (!user?.user_metadata?.role || user.user_metadata.role !== 'admin') {
         console.error('User does not have admin role:', user?.user_metadata?.role);
         showNotification('Access denied - Admin role required', 'error');
         navigate('/login');
       }
     };
-    
+
     checkRole();
   }, [navigate, showNotification]);
 
@@ -178,12 +178,12 @@ function AdminDashboard() {
       try {
         const { data: { session }, error } = await supabase.auth.refreshSession();
         if (error) throw error;
-        
+
         console.log('Refreshed session:', {
           user: session?.user,
           role: session?.user?.user_metadata?.role
         });
-        
+
         // Force reload if role is missing
         if (!session?.user?.user_metadata?.role) {
           await supabase.auth.signOut();
@@ -207,7 +207,7 @@ function AdminDashboard() {
       // First update booking status
       const { error: bookingError } = await supabase
         .from('bookings')
-        .update({ 
+        .update({
           status: 'pending',
           updated_at: new Date().toISOString()
         })
@@ -316,12 +316,11 @@ function AdminDashboard() {
                       {formatTime(booking.cleaning_date)}
                     </p>
                   </div>
-                  <span className={`px-3 py-1 rounded-full text-sm ${
-                    booking.status === 'completed' ? 'bg-success/20 text-success' :
-                    booking.status === 'pending' ? 'bg-warning/20 text-warning' :
-                    booking.status === 'unassigned' ? 'bg-error/20 text-error' :
-                    'bg-gray-500/20 text-gray-500'
-                  }`}>
+                  <span className={`px-3 py-1 rounded-full text-sm ${booking.status === 'completed' ? 'bg-success/20 text-success' :
+                      booking.status === 'pending' ? 'bg-warning/20 text-warning' :
+                        booking.status === 'unassigned' ? 'bg-error/20 text-error' :
+                          'bg-gray-500/20 text-gray-500'
+                    }`}>
                     {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
                   </span>
                 </div>
@@ -363,39 +362,39 @@ function AdminDashboard() {
                   {(booking.status === 'pending' || booking.status === 'unassigned') && (
                     <div className="p-3 rounded bg-background">
                       <p className="text-primary font-medium mb-2">Assign Staff</p>
-                        <select
+                      <select
                         className="w-full bg-input border border-border rounded px-3 py-2 text-primary text-sm"
-                          onChange={(e) => {
-                            if (e.target.value) {
-                              assignStaff(
-                                booking.id,
-                                e.target.value,
-                                booking.cleaning_date,
-                                booking.details.package === 'blockCleaning' 
-                                  ? booking.details.rooms.hours 
-                                  : 2
-                              );
-                            }
-                          }}
-                          defaultValue=""
-                        >
-                          <option value="" disabled>
-                            {staffList.length === 0 ? 'Loading staff...' : 'Select staff member'}
-                          </option>
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            assignStaff(
+                              booking.id,
+                              e.target.value,
+                              booking.cleaning_date,
+                              booking.details.package === 'blockCleaning'
+                                ? booking.details.rooms.hours
+                                : 2
+                            );
+                          }
+                        }}
+                        defaultValue=""
+                      >
+                        <option value="" disabled>
+                          {staffList.length === 0 ? 'Loading staff...' : 'Select staff member'}
+                        </option>
                         {staffList.map(staff => (
-                              <option 
-                                key={staff.id} 
-                                value={staff.id}
-                                disabled={booking.staff_schedules?.some(
-                                  schedule => schedule.staff_id === staff.id
-                                )}
-                              >
-                                {formatStaffName(staff)} {booking.staff_schedules?.some(
-                                  schedule => schedule.staff_id === staff.id
-                                ) ? '(Already assigned)' : ''}
-                              </option>
+                          <option
+                            key={staff.id}
+                            value={staff.id}
+                            disabled={booking.staff_schedules?.some(
+                              schedule => schedule.staff_id === staff.id
+                            )}
+                          >
+                            {formatStaffName(staff)} {booking.staff_schedules?.some(
+                              schedule => schedule.staff_id === staff.id
+                            ) ? '(Already assigned)' : ''}
+                          </option>
                         ))}
-                        </select>
+                      </select>
                     </div>
                   )}
 
@@ -403,9 +402,9 @@ function AdminDashboard() {
                     <div className="p-3 rounded bg-background">
                       <p className="text-primary font-medium mb-2">Assigned Staff</p>
                       <div className="space-y-2">
-                      {booking.staff_schedules.map((schedule, index) => (
-                        <div 
-                          key={index} 
+                        {booking.staff_schedules.map((schedule, index) => (
+                          <div
+                            key={index}
                             className="flex items-center justify-between p-2 rounded bg-container"
                           >
                             <div className="text-sm text-secondary">
@@ -415,25 +414,25 @@ function AdminDashboard() {
                                   hour: 'numeric',
                                   minute: '2-digit',
                                   hour12: true
-                                })} - 
+                                })} -
                                 {new Date(schedule.end_time).toLocaleTimeString([], {
                                   hour: 'numeric',
                                   minute: '2-digit',
                                   hour12: true
                                 })}
-                            </p>
-                          </div>
-                          {booking.status === 'pending' && (
-                            <button
-                              onClick={() => unassignStaff(booking.id, schedule.staff_id)}
+                              </p>
+                            </div>
+                            {booking.status === 'pending' && (
+                              <button
+                                onClick={() => unassignStaff(booking.id, schedule.staff_id)}
                                 className="px-3 py-1 text-xs text-error hover:text-error/80 transition-colors"
-                            >
-                              Remove
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
+                              >
+                                Remove
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -444,7 +443,7 @@ function AdminDashboard() {
           <div className="mt-8">
             <h3 className="text-xl font-semibold text-gold mb-4">Booking Locations</h3>
             <div className="h-[400px] sm:h-[500px] rounded-lg overflow-hidden">
-            <BookingMap bookings={bookings} />
+              <BookingMap bookings={bookings} />
             </div>
           </div>
         </>
@@ -481,23 +480,27 @@ function AdminDashboard() {
               )}
               <button
                 onClick={() => setActiveTab('staff')}
-                className={`px-4 py-2 rounded transition-colors ${
-                  activeTab === 'staff' 
-                    ? 'bg-gold text-background' 
+                className={`px-4 py-2 rounded transition-colors ${activeTab === 'staff'
+                    ? 'bg-gold text-background'
                     : 'text-secondary hover:text-gold'
-                }`}
+                  }`}
               >
                 Staff
               </button>
               <button
                 onClick={() => setActiveTab('bookings')}
-                className={`px-4 py-2 rounded transition-colors ${
-                  activeTab === 'bookings' 
-                    ? 'bg-gold text-background' 
+                className={`px-4 py-2 rounded transition-colors ${activeTab === 'bookings'
+                    ? 'bg-gold text-background'
                     : 'text-secondary hover:text-gold'
-                }`}
+                  }`}
               >
                 Bookings
+              </button>
+              <button
+                onClick={() => navigate('/settings')}
+                className="text-secondary hover:text-gold transition-colors"
+              >
+                Settings
               </button>
               <button
                 onClick={() => signOut()}
@@ -527,11 +530,10 @@ function AdminDashboard() {
                   setActiveTab('staff');
                   setIsMenuOpen(false);
                 }}
-                className={`w-full px-4 py-3 rounded text-left ${
-                  activeTab === 'staff' 
-                    ? 'bg-gold text-background' 
+                className={`w-full px-4 py-3 rounded text-left ${activeTab === 'staff'
+                    ? 'bg-gold text-background'
                     : 'text-secondary hover:bg-container'
-                }`}
+                  }`}
               >
                 Staff Management
               </button>
@@ -540,13 +542,21 @@ function AdminDashboard() {
                   setActiveTab('bookings');
                   setIsMenuOpen(false);
                 }}
-                className={`w-full px-4 py-3 rounded text-left ${
-                  activeTab === 'bookings' 
-                    ? 'bg-gold text-background' 
+                className={`w-full px-4 py-3 rounded text-left ${activeTab === 'bookings'
+                    ? 'bg-gold text-background'
                     : 'text-secondary hover:bg-container'
-                }`}
+                  }`}
               >
                 All Bookings
+              </button>
+              <button
+                onClick={() => {
+                  navigate('/settings');
+                  setIsMenuOpen(false);
+                }}
+                className="w-full px-4 py-3 rounded text-left text-secondary hover:bg-container"
+              >
+                Settings
               </button>
               <button
                 onClick={signOut}
@@ -614,12 +624,11 @@ function AdminDashboard() {
                             {formatTime(booking.cleaning_date)}
                           </p>
                         </div>
-                        <span className={`px-3 py-1 rounded-full text-sm ${
-                          booking.status === 'completed' ? 'bg-success/20 text-success' :
-                          booking.status === 'pending' ? 'bg-warning/20 text-warning' :
-                          booking.status === 'unassigned' ? 'bg-error/20 text-error' :
-                          'bg-gray-500/20 text-gray-500'
-                        }`}>
+                        <span className={`px-3 py-1 rounded-full text-sm ${booking.status === 'completed' ? 'bg-success/20 text-success' :
+                            booking.status === 'pending' ? 'bg-warning/20 text-warning' :
+                              booking.status === 'unassigned' ? 'bg-error/20 text-error' :
+                                'bg-gray-500/20 text-gray-500'
+                          }`}>
                           {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
                         </span>
                       </div>
@@ -669,8 +678,8 @@ function AdminDashboard() {
                                     booking.id,
                                     e.target.value,
                                     booking.cleaning_date,
-                                    booking.details.package === 'blockCleaning' 
-                                      ? booking.details.rooms.hours 
+                                    booking.details.package === 'blockCleaning'
+                                      ? booking.details.rooms.hours
                                       : 2
                                   );
                                 }
@@ -681,8 +690,8 @@ function AdminDashboard() {
                                 {staffList.length === 0 ? 'Loading staff...' : 'Select staff member'}
                               </option>
                               {staffList.map(staff => (
-                                <option 
-                                  key={staff.id} 
+                                <option
+                                  key={staff.id}
                                   value={staff.id}
                                   disabled={booking.staff_schedules?.some(
                                     schedule => schedule.staff_id === staff.id
@@ -702,8 +711,8 @@ function AdminDashboard() {
                             <p className="text-primary font-medium mb-2">Assigned Staff</p>
                             <div className="space-y-2">
                               {booking.staff_schedules.map((schedule, index) => (
-                                <div 
-                                  key={index} 
+                                <div
+                                  key={index}
                                   className="flex items-center justify-between p-2 rounded bg-container"
                                 >
                                   <div className="text-sm text-secondary">
@@ -713,7 +722,7 @@ function AdminDashboard() {
                                         hour: 'numeric',
                                         minute: '2-digit',
                                         hour12: true
-                                      })} - 
+                                      })} -
                                       {new Date(schedule.end_time).toLocaleTimeString([], {
                                         hour: 'numeric',
                                         minute: '2-digit',
@@ -750,7 +759,7 @@ function AdminDashboard() {
             <div className="p-6 space-y-4">
               <div className="flex justify-between items-start">
                 <h2 className="text-xl font-semibold text-gold">Booking Details</h2>
-                <button 
+                <button
                   onClick={() => setIsModalOpen(false)}
                   className="text-secondary hover:text-gold"
                 >
@@ -797,15 +806,15 @@ function AdminDashboard() {
                 <div className="p-4 bg-container rounded-lg">
                   <h3 className="font-medium text-primary mb-2">Actions</h3>
                   <div className="flex gap-2">
-                    <button 
+                    <button
                       className="px-4 py-2 bg-gold text-background rounded hover:bg-gold/90"
-                      onClick={() => {/* Add status update logic */}}
+                      onClick={() => {/* Add status update logic */ }}
                     >
                       Update Status
                     </button>
-                    <button 
+                    <button
                       className="px-4 py-2 bg-error text-background rounded hover:bg-error/90"
-                      onClick={() => {/* Add cancellation logic */}}
+                      onClick={() => {/* Add cancellation logic */ }}
                     >
                       Cancel Booking
                     </button>
