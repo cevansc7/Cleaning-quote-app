@@ -477,8 +477,11 @@ function QuoteCalculator() {
   // Add this test function after the imports
   async function createTestBooking() {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('No authenticated user');
+      if (!user) {
+        showNotification('Please log in to create a test booking', 'error');
+        navigate('/login');
+        return;
+      }
 
       const { data, error } = await supabase
         .from('bookings')
@@ -493,8 +496,8 @@ function QuoteCalculator() {
             serviceType: 'regular',
             price: 150.00,
             client_email: user.email,
-            client_name: 'Test User',
-            client_phone: '1234567890',
+            client_name: profile?.name || 'Test User',
+            client_phone: profile?.phone || '1234567890',
             address: {
               street: '123 Test St',
               city: 'Boise',
@@ -523,9 +526,11 @@ function QuoteCalculator() {
 
       if (error) throw error;
       console.log('Test booking created:', data);
+      showNotification('Test booking created successfully!', 'success');
       return data[0];
     } catch (error) {
       console.error('Error creating test booking:', error);
+      showNotification(error.message, 'error');
       throw error;
     }
   }

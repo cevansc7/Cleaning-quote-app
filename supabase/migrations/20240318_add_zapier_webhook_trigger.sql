@@ -15,8 +15,8 @@ DECLARE webhook_url text;
 payload jsonb;
 BEGIN -- Get webhook URL from environment variable
 webhook_url := COALESCE(
-    current_setting('app.settings.webhook_url', true),
-    'https://hooks.zapier.com/hooks/catch/YOUR_HOOK_ID'
+    current_setting('app.settings.zapier_webhook_url', true),
+    'https://hooks.zapier.com/hooks/catch/15133381/2aa1g16/'
 );
 -- Extract nested data from the details JSONB
 payload = jsonb_build_object(
