@@ -474,67 +474,6 @@ function QuoteCalculator() {
     console.log('showPayment changed:', showPayment);
   }, [showPayment]);
 
-  // Add this test function after the imports
-  async function createTestBooking() {
-    try {
-      if (!user) {
-        showNotification('Please log in to create a test booking', 'error');
-        navigate('/login');
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('bookings')
-        .insert([{
-          client_id: user.id,
-          cleaning_date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days from now
-          status: 'unassigned',
-          payment_status: 'pending',
-          amount_paid: 150.00,
-          details: {
-            package: 'breatheEasy',
-            serviceType: 'regular',
-            price: 150.00,
-            client_email: user.email,
-            client_name: profile?.name || 'Test User',
-            client_phone: profile?.phone || '1234567890',
-            address: {
-              street: '123 Test St',
-              city: 'Boise',
-              state: 'ID',
-              zipCode: '83702',
-              coordinates: {
-                lat: 43.6150,
-                lng: -116.2023
-              }
-            },
-            rooms: {
-              bedrooms: 3,
-              bathrooms: 2,
-              halfBathrooms: 1,
-              kitchens: 1,
-              livingRooms: 1,
-              bonusRooms: 1,
-              laundryRooms: 1,
-              offices: 1,
-              sqft: 2000,
-              dirtyScale: 3
-            }
-          }
-        }])
-        .select();
-
-      if (error) throw error;
-      console.log('Test booking created:', data);
-      showNotification('Test booking created successfully!', 'success');
-      return data[0];
-    } catch (error) {
-      console.error('Error creating test booking:', error);
-      showNotification(error.message, 'error');
-      throw error;
-    }
-  }
-
   return (
     <div className="min-h-screen bg-background">
       <nav className="bg-container border-b border-border">
@@ -939,13 +878,6 @@ function QuoteCalculator() {
             </div>
           </div>
         )}
-
-        <button
-          onClick={createTestBooking}
-          className="btn-secondary mt-4"
-        >
-          Create Test Booking
-        </button>
       </div>
     </div>
   );

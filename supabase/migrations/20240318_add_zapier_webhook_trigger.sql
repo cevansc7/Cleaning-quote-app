@@ -10,14 +10,21 @@ DROP FUNCTION IF EXISTS handle_booking_webhook_trigger_func();
 -- Create the webhook trigger function
 CREATE OR REPLACE FUNCTION handle_booking_webhook_trigger_func() RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public,
-    net AS $$
+    extensions AS $$
 DECLARE webhook_url text;
 payload jsonb;
-BEGIN -- Get webhook URL from environment variable
+response_status int;
+response_content text;
+BEGIN -- Log the start of the function
+RAISE NOTICE 'Starting webhook trigger for booking ID: %',
+NEW.id;
+-- Get webhook URL from environment variable
 webhook_url := COALESCE(
     current_setting('app.settings.zapier_webhook_url', true),
     'https://hooks.zapier.com/hooks/catch/15133381/2aa1g16/'
 );
+RAISE NOTICE 'Using webhook URL: %',
+webhook_url;
 -- Extract nested data from the details JSONB
 payload = jsonb_build_object(
     'booking_id',
@@ -88,21 +95,42 @@ ELSE payload = payload || jsonb_build_object(
 );
 END IF;
 END IF;
--- Send webhook to Zapier using net schema explicitly
-PERFORM net.http_post(
-    url := webhook_url,
-    body := payload::text,
-    headers := jsonb_build_object('Content-Type', 'application/json')
-);
--- Log the webhook attempt
-RAISE NOTICE 'Webhook sent to % with payload: %',
+RAISE NOTICE 'Sending payload: %',
+payload::text;
+-- Send webhook using extensions.http
+SELECT status_code,
+    content::text INTO response_status,
+    response_content
+FROM extensions.http(
+        (
+            'POST',
+            webhook_url,
+            ARRAY [http_header('Content-Type', 'application/json')],
+            'timeout',
+            '10',
+            'body',
+            payload::text
+        )::extensions.http_request
+    );
+-- Log the response
+RAISE NOTICE 'Webhook response status: %, content: %',
+response_status,
+response_content;
+-- Check response status
+IF response_status >= 200
+AND response_status < 300 THEN RAISE NOTICE 'Webhook sent successfully to % with payload: %',
 webhook_url,
 payload::text;
+ELSE RAISE WARNING 'Webhook failed with status %: %',
+response_status,
+payload::text;
+END IF;
 RETURN NEW;
 EXCEPTION
 WHEN OTHERS THEN -- Log error but don't prevent the insert/update
-RAISE WARNING 'Error sending webhook: %',
-SQLERRM;
+RAISE WARNING 'Error sending webhook: % - %',
+SQLERRM,
+payload::text;
 RETURN NEW;
 END;
 $$;
