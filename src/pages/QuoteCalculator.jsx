@@ -79,7 +79,7 @@ function QuoteCalculator() {
 
   const calculateQuote = () => {
     let totalTime = 0;
-    
+
     if (selectedPackage === 'breatheEasy') {
       // Calculate total time based on rooms
       totalTime += parseInt(formData.bedrooms) * baseCleaningTimes.bedroom;
@@ -146,7 +146,7 @@ function QuoteCalculator() {
     try {
       console.log('Geocoding address:', addressString);
       console.log('Using API key:', process.env.REACT_APP_GOOGLE_MAPS_API_KEY);
-      
+
       if (!process.env.REACT_APP_GOOGLE_MAPS_API_KEY) {
         console.error('Google Maps API key is missing');
         showNotification('System configuration error. Please contact support.', 'error');
@@ -164,7 +164,7 @@ function QuoteCalculator() {
 
       const data = await response.json();
       console.log('Raw API Response:', data);
-      
+
       if (data.status === 'ZERO_RESULTS') {
         showNotification('Could not find this address. Please check the address and try again.', 'error');
         return null;
@@ -174,7 +174,7 @@ function QuoteCalculator() {
         showNotification(`Geocoding error: ${data.status}`, 'error');
         return null;
       }
-      
+
       if (data.results && data.results[0]) {
         return data.results[0].geometry.location;
       }
@@ -220,10 +220,10 @@ function QuoteCalculator() {
     try {
       setLoading(true);
       console.log('Starting booking process...');
-      
+
       const { data: { user: authUser }, error: userError } = await supabase.auth.getUser();
       console.log('Auth user:', authUser);
-      
+
       if (userError || !authUser) {
         console.error('User error:', userError);
         showNotification('Please log in to book a cleaning', 'error');
@@ -264,23 +264,23 @@ function QuoteCalculator() {
           package: selectedPackage,
           serviceType: selectedPackage === 'breatheEasy' ? formData.serviceSelection : null,
           price: quoteResult.price,
-          rooms: selectedPackage === 'blockCleaning' 
+          rooms: selectedPackage === 'blockCleaning'
             ? {
-                cleaners: parseInt(formData.cleaners),
-                hours: parseInt(formData.hours)
-              }
+              cleaners: parseInt(formData.cleaners),
+              hours: parseInt(formData.hours)
+            }
             : {
-                bedrooms: parseInt(formData.bedrooms),
-                bathrooms: parseInt(formData.bathrooms),
-                halfBathrooms: parseInt(formData.halfBathrooms),
-                kitchens: parseInt(formData.kitchens),
-                livingRooms: parseInt(formData.livingRooms),
-                bonusRooms: parseInt(formData.bonusRooms),
-                laundryRooms: parseInt(formData.laundryRooms),
-                offices: parseInt(formData.offices),
-                sqft: parseInt(formData.sqft),
-                dirtyScale: parseInt(formData.dirtyScale)
-              },
+              bedrooms: parseInt(formData.bedrooms),
+              bathrooms: parseInt(formData.bathrooms),
+              halfBathrooms: parseInt(formData.halfBathrooms),
+              kitchens: parseInt(formData.kitchens),
+              livingRooms: parseInt(formData.livingRooms),
+              bonusRooms: parseInt(formData.bonusRooms),
+              laundryRooms: parseInt(formData.laundryRooms),
+              offices: parseInt(formData.offices),
+              sqft: parseInt(formData.sqft),
+              dirtyScale: parseInt(formData.dirtyScale)
+            },
           address: {
             street: address.street,
             city: address.city,
@@ -428,7 +428,7 @@ function QuoteCalculator() {
       { booking_id: bookingId, task_name: 'Setup cleaning equipment and supplies', is_completed: false }
     ];
 
-    const serviceTasks = packageType === 'breatheEasy' 
+    const serviceTasks = packageType === 'breatheEasy'
       ? generateBreatheEasyTasks(bookingId, formData)
       : generateBlockCleaningTasks(bookingId, formData);
 
@@ -448,10 +448,10 @@ function QuoteCalculator() {
   const handleDashboardClick = () => {
     console.log('Navigating to dashboard...');
     console.log('User role:', user?.user_metadata?.role);
-    
+
     const path = user?.user_metadata?.role === 'staff' ? '/staff/dashboard' : '/client/dashboard';
     console.log('Navigation path:', path);
-    
+
     navigate(path);
   };
 
@@ -473,6 +473,62 @@ function QuoteCalculator() {
   useEffect(() => {
     console.log('showPayment changed:', showPayment);
   }, [showPayment]);
+
+  // Add this test function after the imports
+  async function createTestBooking() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No authenticated user');
+
+      const { data, error } = await supabase
+        .from('bookings')
+        .insert([{
+          client_id: user.id,
+          cleaning_date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days from now
+          status: 'unassigned',
+          payment_status: 'pending',
+          amount_paid: 150.00,
+          details: {
+            package: 'breatheEasy',
+            serviceType: 'regular',
+            price: 150.00,
+            client_email: user.email,
+            client_name: 'Test User',
+            client_phone: '1234567890',
+            address: {
+              street: '123 Test St',
+              city: 'Boise',
+              state: 'ID',
+              zipCode: '83702',
+              coordinates: {
+                lat: 43.6150,
+                lng: -116.2023
+              }
+            },
+            rooms: {
+              bedrooms: 3,
+              bathrooms: 2,
+              halfBathrooms: 1,
+              kitchens: 1,
+              livingRooms: 1,
+              bonusRooms: 1,
+              laundryRooms: 1,
+              offices: 1,
+              sqft: 2000,
+              dirtyScale: 3
+            }
+          }
+        }])
+        .select();
+
+      if (error) throw error;
+      console.log('Test booking created:', data);
+      return data[0];
+    } catch (error) {
+      console.error('Error creating test booking:', error);
+      throw error;
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -511,14 +567,14 @@ function QuoteCalculator() {
       <div className="quote-container">
         <h2>Choose Your Cleaning Package</h2>
         <div className="package-options">
-          <div 
+          <div
             className={`package-option ${selectedPackage === 'breatheEasy' ? 'selected' : ''}`}
             onClick={() => setSelectedPackage('breatheEasy')}
           >
-            <input 
-              type="radio" 
-              id="breatheEasy" 
-              name="package" 
+            <input
+              type="radio"
+              id="breatheEasy"
+              name="package"
               value="breatheEasy"
               checked={selectedPackage === 'breatheEasy'}
               onChange={(e) => setSelectedPackage(e.target.value)}
@@ -529,14 +585,14 @@ function QuoteCalculator() {
             </label>
           </div>
 
-          <div 
+          <div
             className={`package-option ${selectedPackage === 'blockCleaning' ? 'selected' : ''}`}
             onClick={() => setSelectedPackage('blockCleaning')}
           >
-            <input 
-              type="radio" 
-              id="blockCleaning" 
-              name="package" 
+            <input
+              type="radio"
+              id="blockCleaning"
+              name="package"
               value="blockCleaning"
               checked={selectedPackage === 'blockCleaning'}
               onChange={(e) => setSelectedPackage(e.target.value)}
@@ -554,8 +610,8 @@ function QuoteCalculator() {
               <div className="form-row">
                 <div className="col-span-2">
                   <label htmlFor="serviceSelection">Service Type:</label>
-                  <select 
-                    id="serviceSelection" 
+                  <select
+                    id="serviceSelection"
                     name="serviceSelection"
                     value={formData.serviceSelection}
                     onChange={handleInputChange}
@@ -647,9 +703,9 @@ function QuoteCalculator() {
               <div className="form-row">
                 <div>
                   <label htmlFor="sqft">Approx. Square Footage (Optional):</label>
-                  <input 
-                    type="number" 
-                    id="sqft" 
+                  <input
+                    type="number"
+                    id="sqft"
                     name="sqft"
                     value={formData.sqft}
                     onChange={handleInputChange}
@@ -722,10 +778,10 @@ function QuoteCalculator() {
           <div className="quote-result">
             <h3>Estimated Price</h3>
             <p className="price">${quoteResult.price}</p>
-            
+
             {!showBookingForm ? (
-              <button 
-                type="button" 
+              <button
+                type="button"
                 className="btn"
                 onClick={() => setShowBookingForm(true)}
               >
@@ -762,7 +818,7 @@ function QuoteCalculator() {
 
                 <div className="address-section mt-6 border-t border-border pt-6">
                   <h3 className="text-gold font-semibold mb-4">Service Location</h3>
-                  
+
                   <div className="space-y-4 bg-[#2A3746] p-4 rounded-md">
                     <div className="form-group">
                       <label htmlFor="street" className="text-secondary">Street Address</label>
@@ -823,8 +879,8 @@ function QuoteCalculator() {
                   </div>
                 </div>
 
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   className="btn w-full mt-6"
                   onClick={handleBooking}
                   disabled={loading}
@@ -834,8 +890,8 @@ function QuoteCalculator() {
               </div>
             )}
 
-            <button 
-              type="button" 
+            <button
+              type="button"
               className="btn-secondary mt-4"
               onClick={() => {
                 setQuoteResult(null);
@@ -878,6 +934,13 @@ function QuoteCalculator() {
             </div>
           </div>
         )}
+
+        <button
+          onClick={createTestBooking}
+          className="btn-secondary mt-4"
+        >
+          Create Test Booking
+        </button>
       </div>
     </div>
   );
