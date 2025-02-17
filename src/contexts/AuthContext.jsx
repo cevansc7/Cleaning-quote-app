@@ -106,15 +106,13 @@ export function AuthProvider({ children }) {
           if (!existingProfile) {
             const { error: profileError } = await supabase
               .from('profiles')
-              .insert([
-                {
-                  id: profileData.id,
-                  email: profileData.email,
-                  name: profileData.name,
-                  phone: profileData.phone,
-                  role: profileData.role
-                }
-              ])
+              .insert([{
+                id: profileData.id,
+                email: profileData.email,
+                name: profileData.name,
+                phone: profileData.phone,
+                role: profileData.role
+              }])
               .select();
 
             if (profileError) {
@@ -122,19 +120,7 @@ export function AuthProvider({ children }) {
               throw new Error('Failed to create profile: ' + profileError.message);
             }
 
-            // If the user is registering as staff, add them to the staff table
-            if (profileData.role === 'staff') {
-              const { data: staffData, error: staffError } = await supabase.rpc('add_staff_member', {
-                user_email: profileData.email,
-                user_name: profileData.name,
-                staff_role: 'cleaner'
-              });
-
-              if (staffError) {
-                console.error('Error adding staff member:', staffError);
-                throw new Error('Failed to create staff record: ' + staffError.message);
-              }
-            }
+            // Profile trigger will handle staff table sync automatically
           }
 
           // Clear pending profile data after successful creation
@@ -147,6 +133,21 @@ export function AuthProvider({ children }) {
       if (!profileData) {
         throw new Error('Profile not found after creation');
       }
+
+      // Double-check staff record if user is staff
+      if (profileData.role === 'staff') {
+        const { error: staffError } = await supabase.rpc('add_staff_member', {
+          user_email: profileData.email,
+          user_name: profileData.name,
+          staff_role: 'cleaner'
+        });
+
+        if (staffError) {
+          console.error('Error syncing staff record:', staffError);
+          // Don't throw, as this is just a backup sync
+        }
+      }
+
       setProfile(profileData);
 
       // Return the user role for navigation in the Login component

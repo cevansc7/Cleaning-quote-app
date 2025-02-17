@@ -46,7 +46,39 @@ function Register() {
         throw new Error('No user data returned from signup');
       }
 
-      // Store registration data in localStorage for later profile creation
+      // Create profile immediately
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert([{
+          id: authData.user.id,
+          email: formData.email,
+          name: formData.name,
+          phone: formData.phone,
+          role: formData.role
+        }])
+        .select();
+
+      if (profileError) {
+        console.error('Error creating profile:', profileError);
+        throw new Error('Failed to create profile: ' + profileError.message);
+      }
+
+      // If registering as staff, create staff record immediately
+      if (formData.role === 'staff') {
+        const { error: staffError } = await supabase.rpc('add_staff_member', {
+          user_email: formData.email,
+          user_name: formData.name,
+          staff_role: 'cleaner'
+        });
+
+        if (staffError) {
+          console.error('Error creating staff record:', staffError);
+          // Don't throw here, as the user account is already created
+          // Just log the error and we'll try to fix it on next sign in
+        }
+      }
+
+      // Store minimal registration data in localStorage for backup
       localStorage.setItem('pendingProfile', JSON.stringify({
         id: authData.user.id,
         email: formData.email,
