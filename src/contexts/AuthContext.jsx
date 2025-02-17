@@ -29,14 +29,14 @@ export function AuthProvider({ children }) {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       const currentUser = session?.user ?? null;
       setUser(currentUser);
-      
+
       if (currentUser) {
         const profileData = await fetchProfile(currentUser.id);
         setProfile(profileData);
       } else {
         setProfile(null);
       }
-      
+
       setLoading(false);
     });
 
@@ -44,14 +44,14 @@ export function AuthProvider({ children }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       const currentUser = session?.user ?? null;
       setUser(currentUser);
-      
+
       if (currentUser) {
         const profileData = await fetchProfile(currentUser.id);
         setProfile(profileData);
       } else {
         setProfile(null);
       }
-      
+
       setLoading(false);
     });
 
@@ -67,7 +67,36 @@ export function AuthProvider({ children }) {
 
       if (error) throw error;
 
-      // Fetch profile after successful sign in
+      // Check for pending profile data
+      const pendingProfile = localStorage.getItem('pendingProfile');
+      if (pendingProfile) {
+        const profileData = JSON.parse(pendingProfile);
+
+        // Only create profile if it matches the current user
+        if (profileData.id === user.id) {
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .insert([
+              {
+                id: profileData.id,
+                email: profileData.email,
+                name: profileData.name,
+                phone: profileData.phone,
+                role: profileData.role
+              }
+            ])
+            .select();
+
+          if (profileError) {
+            console.error('Error creating profile:', profileError);
+          } else {
+            // Clear pending profile data after successful creation
+            localStorage.removeItem('pendingProfile');
+          }
+        }
+      }
+
+      // Fetch profile after sign in (and possible profile creation)
       const profileData = await fetchProfile(user.id);
       setProfile(profileData);
 

@@ -33,6 +33,8 @@ function Register() {
         password: formData.password,
         options: {
           data: {
+            name: formData.name,
+            phone: formData.phone,
             role: formData.role
           }
         }
@@ -44,33 +46,17 @@ function Register() {
         throw new Error('No user data returned from signup');
       }
 
-      // Wait a moment for the user to be fully created
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Refresh the schema cache before inserting
-      await supabase.schema('public').refresh();
-
-      // Create the profile
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert([
-          {
-            id: authData.user.id,
-            email: formData.email,
-            name: formData.name,
-            phone: formData.phone,
-            role: formData.role
-          }
-        ])
-        .select();
-
-      if (profileError) {
-        console.error('Profile creation error:', profileError);
-        throw profileError;
-      }
+      // Store registration data in localStorage for later profile creation
+      localStorage.setItem('pendingProfile', JSON.stringify({
+        id: authData.user.id,
+        email: formData.email,
+        name: formData.name,
+        phone: formData.phone,
+        role: formData.role
+      }));
 
       // Registration successful
-      alert('Registration successful! Please check your email for verification.');
+      alert('Registration successful! Please check your email for verification. After verifying your email, you can log in to complete your profile setup.');
       navigate('/login');
 
     } catch (error) {
