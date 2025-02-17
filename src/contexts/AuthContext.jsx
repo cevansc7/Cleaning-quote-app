@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
+import { addStaffMember } from '../utils/staffUtils';
 
 const AuthContext = createContext({});
 
@@ -10,16 +11,37 @@ export function AuthProvider({ children }) {
 
   const fetchProfile = async (userId) => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
+      // Try up to 3 times with a small delay between attempts
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .single();
 
-      if (error) throw error;
-      return data;
+        if (error) {
+          console.error(`Error fetching profile (attempt ${attempt}/3):`, error);
+          if (attempt < 3) {
+            // Wait for 500ms before retrying
+            await new Promise(resolve => setTimeout(resolve, 500));
+            continue;
+          }
+          throw error;
+        }
+
+        if (!data) {
+          console.error(`No profile found for user ${userId} (attempt ${attempt}/3)`);
+          if (attempt < 3) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            continue;
+          }
+          return null;
+        }
+
+        return data;
+      }
     } catch (error) {
-      console.error('Error fetching profile:', error);
+      console.error('Error fetching profile after all retries:', error);
       return null;
     }
   };
@@ -74,34 +96,61 @@ export function AuthProvider({ children }) {
 
         // Only create profile if it matches the current user
         if (profileData.id === user.id) {
-          const { error: profileError } = await supabase
+          // First check if profile already exists
+          const { data: existingProfile } = await supabase
             .from('profiles')
-            .insert([
-              {
-                id: profileData.id,
-                email: profileData.email,
-                name: profileData.name,
-                phone: profileData.phone,
-                role: profileData.role
-              }
-            ])
-            .select();
+            .select('*')
+            .eq('id', user.id)
+            .single();
 
-          if (profileError) {
-            console.error('Error creating profile:', profileError);
-          } else {
-            // Clear pending profile data after successful creation
-            localStorage.removeItem('pendingProfile');
+          if (!existingProfile) {
+            const { error: profileError } = await supabase
+              .from('profiles')
+              .insert([
+                {
+                  id: profileData.id,
+                  email: profileData.email,
+                  name: profileData.name,
+                  phone: profileData.phone,
+                  role: profileData.role
+                }
+              ])
+              .select();
+
+            if (profileError) {
+              console.error('Error creating profile:', profileError);
+              throw new Error('Failed to create profile: ' + profileError.message);
+            }
+
+            // If the user is registering as staff, add them to the staff table
+            if (profileData.role === 'staff') {
+              const { data: staffData, error: staffError } = await supabase.rpc('add_staff_member', {
+                user_email: profileData.email,
+                user_name: profileData.name,
+                staff_role: 'cleaner'
+              });
+
+              if (staffError) {
+                console.error('Error adding staff member:', staffError);
+                throw new Error('Failed to create staff record: ' + staffError.message);
+              }
+            }
           }
+
+          // Clear pending profile data after successful creation
+          localStorage.removeItem('pendingProfile');
         }
       }
 
       // Fetch profile after sign in (and possible profile creation)
       const profileData = await fetchProfile(user.id);
+      if (!profileData) {
+        throw new Error('Profile not found after creation');
+      }
       setProfile(profileData);
 
       // Return the user role for navigation in the Login component
-      return user.user_metadata?.role;
+      return profileData.role;
 
     } catch (error) {
       console.error('Error signing in:', error);
