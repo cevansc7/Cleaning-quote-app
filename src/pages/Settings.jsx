@@ -15,64 +15,52 @@ function Settings() {
             setLoading(true);
             setError(null);
 
+            if (!user?.id) {
+                throw new Error('No user found. Please sign in again.');
+            }
+
             // Call the RPC function to delete the user
             const { data, error: deleteError } = await supabase.rpc('handle_user_deletion', {
                 target_user_id: user.id
             });
 
-            if (deleteError) throw deleteError;
+            if (deleteError) {
+                console.error('Delete error:', deleteError);
+                throw new Error(deleteError.message || 'Failed to delete account');
+            }
 
-            if (!data.success) {
-                throw new Error(data.error || 'Failed to delete account');
+            if (!data?.success) {
+                console.error('Delete failed:', data);
+                throw new Error(data?.error || 'Failed to delete account');
             }
 
             // Sign out after successful deletion
             await signOut();
-            navigate('/');
+            navigate('/', { replace: true });
         } catch (error) {
             console.error('Error deleting account:', error);
-            setError(error.message);
+            setError(error.message || 'An unexpected error occurred while deleting your account');
+            setShowConfirmation(false);
         } finally {
             setLoading(false);
-            setShowConfirmation(false);
         }
     };
 
     return (
-        <div className="min-h-screen bg-background">
-            <nav className="bg-container border-b border-border">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex justify-between items-center h-16">
-                        <div className="text-gold">Account Settings</div>
-                        <button
-                            onClick={() => navigate(-1)}
-                            className="text-secondary hover:text-gold transition-colors"
-                        >
-                            Back
-                        </button>
-                    </div>
-                </div>
-            </nav>
+        <div className="min-h-screen bg-gray-100">
+            <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+                <div className="px-4 py-6 sm:px-0">
+                    <div className="bg-white shadow rounded-lg p-6">
+                        <h2 className="text-2xl font-bold mb-6">Account Settings</h2>
 
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                <div className="bg-container rounded-lg shadow p-6 max-w-2xl mx-auto">
-                    <h1 className="text-2xl font-bold text-gold mb-6">Account Settings</h1>
-
-                    <div className="space-y-6">
-                        {/* Account Information */}
-                        <div>
-                            <h2 className="text-xl text-primary mb-4">Account Information</h2>
-                            <div className="space-y-2">
-                                <p><span className="text-secondary">Email:</span> {user?.email}</p>
-                                <p><span className="text-secondary">Name:</span> {profile?.name}</p>
-                                <p><span className="text-secondary">Phone:</span> {profile?.phone}</p>
-                                <p><span className="text-secondary">Role:</span> {profile?.role}</p>
+                        <div className="space-y-6">
+                            <div className="border-t pt-6">
+                                <h3 className="text-lg font-medium text-gray-900 mb-4">Delete Account</h3>
+                                <p className="text-gray-500 mb-4">
+                                    Once you delete your account, all of your data will be permanently removed.
+                                    This action cannot be undone.
+                                </p>
                             </div>
-                        </div>
-
-                        {/* Danger Zone */}
-                        <div className="border-t border-border pt-6">
-                            <h2 className="text-xl text-error mb-4">Danger Zone</h2>
 
                             {error && (
                                 <div className="bg-error/10 border border-error text-error px-4 py-2 rounded mb-4">
