@@ -457,10 +457,14 @@ function QuoteCalculator() {
 
   const handleSignOut = async () => {
     try {
+      setLoading(true);
       await signOut();
-      navigate('/login');
+      navigate('/login', { replace: true });
     } catch (error) {
       console.error('Error signing out:', error);
+      showNotification('Error signing out. Please try again.', 'error');
+    } finally {
+      setLoading(false);
     }
   };
 

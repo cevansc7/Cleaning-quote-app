@@ -95,10 +95,14 @@ function Dashboard() {
 
   const handleSignOut = async () => {
     try {
+      setLoading(true);
       await signOut();
-      navigate('/login');
+      navigate('/login', { replace: true });
     } catch (error) {
       console.error('Error signing out:', error);
+      showNotification('Error signing out. Please try again.', 'error');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -179,8 +183,8 @@ function Dashboard() {
                     </p>
                   </div>
                   <span className={`px-3 py-1 rounded-full text-sm ${booking.status === 'completed' ? 'bg-success/20 text-success' :
-                      booking.status === 'pending' ? 'bg-gold/20 text-gold' :
-                        'bg-error/20 text-error'
+                    booking.status === 'pending' ? 'bg-gold/20 text-gold' :
+                      'bg-error/20 text-error'
                     }`}>
                     {booking.status}
                   </span>

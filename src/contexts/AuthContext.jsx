@@ -162,7 +162,9 @@ export function AuthProvider({ children }) {
   const signOut = async () => {
     try {
       await supabase.auth.signOut();
+      setUser(null);
       setProfile(null);
+      localStorage.removeItem('pendingProfile');
     } catch (error) {
       console.error('Error signing out:', error);
       throw error;
